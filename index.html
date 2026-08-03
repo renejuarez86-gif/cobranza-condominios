@@ -479,47 +479,58 @@
     // DRAG & DROP + SELECCIÓN DE ARCHIVO
     // ─────────────────────────────────────────────────────────────
 
-    // Bloquear TODA acción por defecto del navegador al arrastrar
-    // archivos (evita el diálogo "Guardar como").
-    // Se usa capture: true para interceptar ANTES que cualquier otro handler.
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evtName => {
-      window.addEventListener(evtName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }, { capture: true });
-    });
+    // Prevenir que el navegador abra/descargue archivos arrastrados
+    // SOLO preventDefault, sin stopPropagation para que los eventos
+    // sigan llegando al dropzone.
+    document.addEventListener('dragenter', (e) => e.preventDefault());
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => e.preventDefault());
 
-    // Resaltar la zona al arrastrar un archivo sobre ella
+    // Contador para manejar dragenter/dragleave en hijos del dropzone
+    let dragCounter = 0;
+
     dropzoneEl.addEventListener('dragenter', (e) => {
       e.preventDefault();
+      dragCounter++;
       dropzoneEl.classList.add('dragover');
     });
 
     dropzoneEl.addEventListener('dragover', (e) => {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-      dropzoneEl.classList.add('dragover');
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     });
 
     dropzoneEl.addEventListener('dragleave', (e) => {
       e.preventDefault();
-      dropzoneEl.classList.remove('dragover');
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropzoneEl.classList.remove('dragover');
+      }
     });
 
-    // Soltar archivo
+    // Soltar archivo en la zona
     dropzoneEl.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      dragCounter = 0;
       dropzoneEl.classList.remove('dragover');
-      const files = e.dataTransfer.files;
-      if (files.length > 0) handleFileSelection(files[0]);
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        handleFileSelection(e.dataTransfer.files[0]);
+      }
     });
 
-    // Click en la zona abre el selector de archivos
-    dropzoneEl.addEventListener('click', () => fileInputEl.click());
+    // Click en la zona abre el selector de archivos nativo
+    dropzoneEl.addEventListener('click', () => {
+      fileInputEl.value = '';  // Reset para permitir re-selección del mismo archivo
+      fileInputEl.click();
+    });
 
-    // Seleccionar archivo con el input nativo
+    // Cuando el usuario selecciona un archivo con el diálogo nativo
     fileInputEl.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) handleFileSelection(e.target.files[0]);
+      if (e.target.files && e.target.files.length > 0) {
+        handleFileSelection(e.target.files[0]);
+      }
     });
 
     /**
