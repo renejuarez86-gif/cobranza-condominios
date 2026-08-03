@@ -105,10 +105,7 @@
     }
 
     .dropzone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
+      display: none;
     }
 
     /* ── Indicador de archivo seleccionado ────────────────────── */
@@ -319,8 +316,8 @@
       <span class="dropzone-icon">📄</span>
       <div class="dropzone-label">Arrastra tu archivo aquí</div>
       <div class="dropzone-sub">o haz clic para seleccionar — solo .xlsx</div>
-      <input type="file" id="fileInput" accept=".xlsx">
     </div>
+    <input type="file" id="fileInput" accept=".xlsx">
 
     <!-- Info del archivo seleccionado -->
     <div class="file-info" id="fileInfo">
@@ -482,23 +479,33 @@
     // DRAG & DROP + SELECCIÓN DE ARCHIVO
     // ─────────────────────────────────────────────────────────────
 
+    // Prevenir que el navegador abra el archivo al soltarlo
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => e.preventDefault());
+
     // Resaltar la zona al arrastrar un archivo sobre ella
     dropzoneEl.addEventListener('dragover', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       dropzoneEl.classList.add('dragover');
     });
 
-    dropzoneEl.addEventListener('dragleave', () => {
+    dropzoneEl.addEventListener('dragleave', (e) => {
+      e.preventDefault();
       dropzoneEl.classList.remove('dragover');
     });
 
     // Soltar archivo
     dropzoneEl.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       dropzoneEl.classList.remove('dragover');
       const files = e.dataTransfer.files;
       if (files.length > 0) handleFileSelection(files[0]);
     });
+
+    // Click en la zona abre el selector de archivos
+    dropzoneEl.addEventListener('click', () => fileInputEl.click());
 
     // Seleccionar archivo con el input nativo
     fileInputEl.addEventListener('change', (e) => {
