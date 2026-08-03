@@ -63,45 +63,36 @@
       max-width: 640px;
     }
 
-    /* ── Zona de drag & drop ─────────────────────────────────── */
-    .dropzone {
+    .file-selection-area {
+      text-align: center;
+      padding: 2rem 1rem;
+      background: #f0fdf4;
       border: 2px dashed #a7f3d0;
       border-radius: 12px;
-      padding: 3rem 1.5rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      background: #f0fdf4;
-      position: relative;
+      margin-bottom: 1rem;
     }
 
-    .dropzone:hover,
-    .dropzone.dragover {
-      border-color: #10b981;
-      background: #ecfdf5;
-      transform: translateY(-1px);
-    }
-
-    .dropzone.dragover {
-      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
-    }
-
-    .dropzone-icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.75rem;
-      display: block;
-    }
-
-    .dropzone-label {
-      font-size: 1rem;
+    .btn-select-file {
+      display: inline-block;
+      padding: 0.85rem 1.5rem;
+      background: #064e3b;
+      color: white;
+      border-radius: 8px;
       font-weight: 600;
-      color: #064e3b;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
     }
 
-    .dropzone-sub {
-      font-size: 0.82rem;
-      color: #94a3b8;
-      margin-top: 0.3rem;
+    .btn-select-file:hover {
+      background: #022c22;
+    }
+
+    .file-hint {
+      display: block;
+      font-size: 0.85rem;
+      color: #64748b;
     }
 
     #fileInput {
@@ -306,18 +297,19 @@
        MARKUP — Interfaz de la herramienta
        ═══════════════════════════════════════════════════════════ -->
   <header class="header">
-    <h1>📋 Carga de Deudores</h1>
+    <h1>📋 Subir Archivo de Morosidad</h1>
     <p>Sube el archivo Excel de recuperación de cartera</p>
   </header>
 
   <main class="card">
-    <!-- Zona de arrastrar archivo -->
-    <div class="dropzone" id="dropzone">
-      <span class="dropzone-icon">📄</span>
-      <div class="dropzone-label">Arrastra tu archivo aquí</div>
-      <div class="dropzone-sub">o haz clic para seleccionar — solo .xlsx</div>
+    <!-- Zona de selección de archivo simple -->
+    <div class="file-selection-area">
+      <label for="fileInput" class="btn-select-file">
+        📂 Seleccionar Archivo Excel
+      </label>
+      <span class="file-hint">Formato aceptado: .xlsx</span>
+      <input type="file" id="fileInput" accept=".xlsx">
     </div>
-    <input type="file" id="fileInput" accept=".xlsx">
 
     <!-- Info del archivo seleccionado -->
     <div class="file-info" id="fileInfo">
@@ -385,7 +377,6 @@
     // ─────────────────────────────────────────────────────────────
     // REFERENCIAS AL DOM
     // ─────────────────────────────────────────────────────────────
-    const dropzoneEl     = document.getElementById('dropzone');
     const fileInputEl    = document.getElementById('fileInput');
     const fileInfoEl     = document.getElementById('fileInfo');
     const fileNameEl     = document.getElementById('fileName');
@@ -476,57 +467,10 @@
     }
 
     // ─────────────────────────────────────────────────────────────
-    // DRAG & DROP + SELECCIÓN DE ARCHIVO
+    // SELECCIÓN DE ARCHIVO
     // ─────────────────────────────────────────────────────────────
 
-    // Prevenir que el navegador abra/descargue archivos arrastrados
-    // SOLO preventDefault, sin stopPropagation para que los eventos
-    // sigan llegando al dropzone.
-    document.addEventListener('dragenter', (e) => e.preventDefault());
-    document.addEventListener('dragover', (e) => e.preventDefault());
-    document.addEventListener('drop', (e) => e.preventDefault());
-
-    // Contador para manejar dragenter/dragleave en hijos del dropzone
-    let dragCounter = 0;
-
-    dropzoneEl.addEventListener('dragenter', (e) => {
-      e.preventDefault();
-      dragCounter++;
-      dropzoneEl.classList.add('dragover');
-    });
-
-    dropzoneEl.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    });
-
-    dropzoneEl.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dragCounter--;
-      if (dragCounter <= 0) {
-        dragCounter = 0;
-        dropzoneEl.classList.remove('dragover');
-      }
-    });
-
-    // Soltar archivo en la zona
-    dropzoneEl.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragCounter = 0;
-      dropzoneEl.classList.remove('dragover');
-      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
-        handleFileSelection(e.dataTransfer.files[0]);
-      }
-    });
-
-    // Click en la zona abre el selector de archivos nativo
-    dropzoneEl.addEventListener('click', () => {
-      fileInputEl.value = '';  // Reset para permitir re-selección del mismo archivo
-      fileInputEl.click();
-    });
-
-    // Cuando el usuario selecciona un archivo con el diálogo nativo
+    // Cuando el usuario selecciona un archivo con el botón
     fileInputEl.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length > 0) {
         handleFileSelection(e.target.files[0]);
