@@ -470,8 +470,14 @@
     // SELECCIÓN DE ARCHIVO
     // ─────────────────────────────────────────────────────────────
 
+    // Permitir seleccionar el mismo archivo varias veces limpiando el valor previo
+    fileInputEl.addEventListener('click', function(e) {
+      e.target.value = '';
+    });
+
     // Cuando el usuario selecciona un archivo con el botón
     fileInputEl.addEventListener('change', (e) => {
+      console.log('Evento change disparado. Archivos:', e.target.files);
       if (e.target.files && e.target.files.length > 0) {
         handleFileSelection(e.target.files[0]);
       }
