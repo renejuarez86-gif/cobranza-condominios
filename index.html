@@ -372,7 +372,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_-QaNjJds8rO31NqFeinfGQ_eeVtk5bI';
 
     // Inicializar cliente Supabase
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ─────────────────────────────────────────────────────────────
     // REFERENCIAS AL DOM
@@ -640,7 +640,7 @@
 
           try {
             // ── Verificar si ya existe un registro con mismo lote + condominio ──
-            const { data: existing, error: selectError } = await supabase
+            const { data: existing, error: selectError } = await supabaseClient
               .from('deudores')
               .select('id_deudor')
               .eq('lote', row.lote)
@@ -651,7 +651,7 @@
 
             if (existing) {
               // ── UPDATE: el registro ya existe ──
-              const { error: updateError } = await supabase
+              const { error: updateError } = await supabaseClient
                 .from('deudores')
                 .update(record)
                 .eq('id_deudor', existing.id_deudor);
@@ -664,7 +664,7 @@
               record.estado_contacto = 'Pendiente';
               record.fecha_alta = today;
 
-              const { error: insertError } = await supabase
+              const { error: insertError } = await supabaseClient
                 .from('deudores')
                 .insert(record);
 
