@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Cobranza — Carga de Deudores</title>
+  <meta name="description" content="Herramienta interna para administradores de condominios. Carga masiva de deudores desde Excel a Supabase.">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       DEPENDENCIAS CDN
+       ═══════════════════════════════════════════════════════════ -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       ESTILOS — Todo inline para archivo único
+       ═══════════════════════════════════════════════════════════ -->
+  <style>
+    /* ── Reset y base ────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f8faf9;
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #064e3b;
+      letter-spacing: -0.02em;
+    }
+
+    .header p {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 0.35rem;
+    }
+
+    /* ── Tarjeta principal ───────────────────────────────────── */
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* ── Zona de drag & drop ─────────────────────────────────── */
+    .dropzone {
+      border: 2px dashed #a7f3d0;
+      border-radius: 12px;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #f0fdf4;
+      position: relative;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragover {
+      border-color: #10b981;
+      background: #ecfdf5;
+      transform: translateY(-1px);
+    }
+
+    .dropzone.dragover {
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    .dropzone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .dropzone-label {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #064e3b;
+    }
+
+    .dropzone-sub {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-top: 0.3rem;
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    /* ── Indicador de archivo seleccionado ────────────────────── */
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      padding: 0.85rem 1rem;
+      background: #f0fdf4;
+      border-radius: 10px;
+      border: 1px solid #a7f3d0;
+    }
+
+    .file-info.visible { display: flex; }
+
+    .file-info-icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+
+    .file-info-details {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-info-name {
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: #064e3b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-info-meta {
+      font-size: 0.78rem;
+      color: #64748b;
+    }
+
+    /* ── Botón procesar ──────────────────────────────────────── */
+    .btn-process {
+      display: none;
+      width: 100%;
+      margin-top: 1.25rem;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 10px;
+      background: #10b981;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-process:hover { background: #059669; }
+    .btn-process:active { transform: scale(0.985); }
+    .btn-process:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-process.visible { display: block; }
+
+    /* ── Barra de progreso ───────────────────────────────────── */
+    .progress-section {
+      display: none;
+      margin-top: 1.5rem;
+    }
+
+    .progress-section.visible { display: block; }
+
+    .progress-text {
+      font-size: 0.85rem;
+      color: #475569;
+      margin-bottom: 0.5rem;
+      min-height: 1.3em;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      border-radius: 99px;
+      transition: width 0.15s ease;
+    }
+
+    /* ── Resumen de resultados ────────────────────────────────── */
+    .results {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .results.visible { display: block; }
+
+    .results h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #064e3b;
+      margin-bottom: 0.75rem;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+
+    .result-item {
+      text-align: center;
+      padding: 0.6rem;
+      border-radius: 8px;
+    }
+
+    .result-item.inserted { background: #ecfdf5; }
+    .result-item.updated { background: #eff6ff; }
+    .result-item.errors { background: #fef2f2; }
+
+    .result-number {
+      font-size: 1.6rem;
+      font-weight: 700;
+      display: block;
+    }
+
+    .result-item.inserted .result-number { color: #10b981; }
+    .result-item.updated .result-number { color: #3b82f6; }
+    .result-item.errors .result-number { color: #ef4444; }
+
+    .result-label {
+      font-size: 0.75rem;
+      color: #64748b;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Log de errores ──────────────────────────────────────── */
+    .error-log {
+      display: none;
+      margin-top: 1rem;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 0.78rem;
+      color: #dc2626;
+      background: #fff5f5;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      line-height: 1.6;
+    }
+
+    .error-log.visible { display: block; }
+
+    /* ── Alertas / errores globales ───────────────────────────── */
+    .alert {
+      display: none;
+      margin-top: 1.25rem;
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .alert.visible { display: block; }
+
+    .alert-error {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MARKUP — Interfaz de la herramienta
+       ═══════════════════════════════════════════════════════════ -->
+  <header class="header">
+    <h1>📋 Carga de Deudores</h1>
+    <p>Sube el archivo Excel de recuperación de cartera</p>
+  </header>
+
+  <main class="card">
+    <!-- Zona de arrastrar archivo -->
+    <div class="dropzone" id="dropzone">
+      <span class="dropzone-icon">📄</span>
+      <div class="dropzone-label">Arrastra tu archivo aquí</div>
+      <div class="dropzone-sub">o haz clic para seleccionar — solo .xlsx</div>
+      <input type="file" id="fileInput" accept=".xlsx">
+    </div>
+
+    <!-- Info del archivo seleccionado -->
+    <div class="file-info" id="fileInfo">
+      <span class="file-info-icon">📊</span>
+      <div class="file-info-details">
+        <div class="file-info-name" id="fileName">—</div>
+        <div class="file-info-meta" id="fileMeta">—</div>
+      </div>
+    </div>
+
+    <!-- Botón procesar -->
+    <button class="btn-process" id="btnProcess">🚀 Procesar y cargar a Supabase</button>
+
+    <!-- Alerta de error global -->
+    <div class="alert alert-error" id="alertError"></div>
+
+    <!-- Sección de progreso -->
+    <div class="progress-section" id="progressSection">
+      <div class="progress-text" id="progressText">Preparando...</div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+
+    <!-- Resumen de resultados -->
+    <div class="results" id="results">
+      <h3>✅ Proceso completado</h3>
+      <div class="results-grid">
+        <div class="result-item inserted">
+          <span class="result-number" id="countInserted">0</span>
+          <span class="result-label">Nuevos</span>
+        </div>
+        <div class="result-item updated">
+          <span class="result-number" id="countUpdated">0</span>
+          <span class="result-label">Actualizados</span>
+        </div>
+        <div class="result-item errors">
+          <span class="result-number" id="countErrors">0</span>
+          <span class="result-label">Errores</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log detallado de errores -->
+    <div class="error-log" id="errorLog"></div>
+  </main>
+
+  <footer class="footer">
+    Sistema interno de administración de condominios · v1.0
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       JAVASCRIPT — Toda la lógica de negocio
+       ═══════════════════════════════════════════════════════════ -->
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    // CREDENCIALES SUPABASE — Reemplazar con valores reales
+    // ─────────────────────────────────────────────────────────────
+    const SUPABASE_URL  = 'https://huwnwisvbbvrpiorrcdx.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_-QaNjJds8rO31NqFeinfGQ_eeVtk5bI';
+
+    // Inicializar cliente Supabase
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ─────────────────────────────────────────────────────────────
+    // REFERENCIAS AL DOM
+    // ─────────────────────────────────────────────────────────────
+    const dropzoneEl     = document.getElementById('dropzone');
+    const fileInputEl    = document.getElementById('fileInput');
+    const fileInfoEl     = document.getElementById('fileInfo');
+    const fileNameEl     = document.getElementById('fileName');
+    const fileMetaEl     = document.getElementById('fileMeta');
+    const btnProcessEl   = document.getElementById('btnProcess');
+    const alertErrorEl   = document.getElementById('alertError');
+    const progressEl     = document.getElementById('progressSection');
+    const progressTextEl = document.getElementById('progressText');
+    const progressBarEl  = document.getElementById('progressBar');
+    const resultsEl      = document.getElementById('results');
+    const countInsertedEl = document.getElementById('countInserted');
+    const countUpdatedEl  = document.getElementById('countUpdated');
+    const countErrorsEl   = document.getElementById('countErrors');
+    const errorLogEl      = document.getElementById('errorLog');
+
+    // Estado global
+    let selectedFile  = null;
+    let condominioId  = '';
+
+    // ─────────────────────────────────────────────────────────────
+    // UTILIDADES
+    // ─────────────────────────────────────────────────────────────
+
+    /** Muestra u oculta un elemento con la clase 'visible' */
+    function show(el) { el.classList.add('visible'); }
+    function hide(el) { el.classList.remove('visible'); }
+
+    /** Muestra un error global en la interfaz */
+    function showError(msg) {
+      alertErrorEl.textContent = msg;
+      show(alertErrorEl);
+    }
+
+    /** Oculta el error global */
+    function hideError() { hide(alertErrorEl); }
+
+    /** Resetea toda la sección de resultados y progreso */
+    function resetResults() {
+      hide(resultsEl);
+      hide(progressEl);
+      hide(errorLogEl);
+      hideError();
+      progressBarEl.style.width = '0%';
+      errorLogEl.innerHTML = '';
+    }
+
+    /**
+     * Extrae el ID del condominio desde el nombre del archivo.
+     * Busca la última parte del nombre (después del último _)
+     * y le quita la extensión.
+     * Ej: RECUPERACION_DE_CARTERA_ALBA.xlsx → "alba"
+     * Ej: REPORTE.xlsx → "reporte"
+     */
+    function extractCondominioId(filename) {
+      // Quitar extensión
+      const sinExt = filename.replace(/\.xlsx$/i, '');
+      // Tomar la parte después del último guión bajo
+      const parts = sinExt.split('_');
+      const id = parts[parts.length - 1];
+      return id.toLowerCase().trim();
+    }
+
+    /** Formatea bytes a tamaño legible */
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    /**
+     * Limpia un valor numérico del Excel.
+     * Quita símbolos de moneda, comas, y convierte a número.
+     * Retorna null si no es un número válido.
+     */
+    function cleanNumeric(val) {
+      if (val === null || val === undefined || val === '') return null;
+      if (typeof val === 'number') return val;
+      const cleaned = String(val).replace(/[$,\s]/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? null : num;
+    }
+
+    /** Convierte cualquier valor a string limpio, o null si está vacío */
+    function cleanText(val) {
+      if (val === null || val === undefined) return null;
+      const s = String(val).trim();
+      return s === '' ? null : s;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // DRAG & DROP + SELECCIÓN DE ARCHIVO
+    // ─────────────────────────────────────────────────────────────
+
+    // Resaltar la zona al arrastrar un archivo sobre ella
+    dropzoneEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzoneEl.classList.add('dragover');
+    });
+
+    dropzoneEl.addEventListener('dragleave', () => {
+      dropzoneEl.classList.remove('dragover');
+    });
+
+    // Soltar archivo
+    dropzoneEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzoneEl.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) handleFileSelection(files[0]);
+    });
+
+    // Seleccionar archivo con el input nativo
+    fileInputEl.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleFileSelection(e.target.files[0]);
+    });
+
+    /**
+     * Maneja la selección de archivo:
+     * - Valida extensión .xlsx
+     * - Extrae el ID del condominio
+     * - Muestra info del archivo en la UI
+     */
+    function handleFileSelection(file) {
+      resetResults();
+      hideError();
+
+      // Validar extensión
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        showError('Solo se aceptan archivos .xlsx');
+        selectedFile = null;
+        hide(fileInfoEl);
+        hide(btnProcessEl);
+        return;
+      }
+
+      selectedFile = file;
+      condominioId = extractCondominioId(file.name);
+
+      // Mostrar información del archivo
+      fileNameEl.textContent = file.name;
+      fileMetaEl.textContent = `${formatFileSize(file.size)} · Condominio: ${condominioId.toUpperCase()}`;
+      show(fileInfoEl);
+      show(btnProcessEl);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROCESAMIENTO DEL EXCEL
+    // ─────────────────────────────────────────────────────────────
+
+    btnProcessEl.addEventListener('click', () => processFile());
+
+    async function processFile() {
+      if (!selectedFile) return;
+
+      // Deshabilitar botón y resetear UI
+      btnProcessEl.disabled = true;
+      btnProcessEl.textContent = '⏳ Procesando...';
+      resetResults();
+      show(progressEl);
+      progressTextEl.textContent = 'Leyendo archivo Excel...';
+
+      try {
+        // ── Paso 1: Leer el archivo como ArrayBuffer ──────────
+        const data = await selectedFile.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // ── Paso 2: Extraer filas válidas de TODAS las hojas ──
+        const allRows = [];
+
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+
+          // Convertir hoja a array de arrays (incluye filas vacías)
+          const rawRows = XLSX.utils.sheet_to_json(sheet, {
+            header: 1,       // Devuelve arrays, no objetos
+            defval: null,    // Valor por defecto para celdas vacías
+            blankrows: false  // Omitir filas completamente vacías
+          });
+
+          // Saltar las primeras 5 filas (headers están en fila 6, índice 5)
+          // La fila 6 (índice 5) es el header — los datos empiezan en índice 6
+          const dataRows = rawRows.slice(6);
+
+          for (const row of dataRows) {
+            const propietario  = cleanText(row[3]);
+            const adeudoTotal  = cleanNumeric(row[13]);
+
+            // Filtrar filas sin Propietario o sin Adeudo Total
+            if (!propietario || adeudoTotal === null) continue;
+
+            allRows.push({
+              lote:                  cleanText(row[1]) || cleanText(row[2]),
+              casa_lote:             cleanText(row[2]),
+              propietario:           propietario,
+              correo:                cleanText(row[4]),
+              telefono:              cleanText(row[5]),
+              habitan:               cleanText(row[6]),
+              residente_inquilino:   cleanText(row[7]),
+              meses_atraso:          cleanText(row[8]),
+              adeudo_mantenimiento:  cleanNumeric(row[9]),
+              adeudo_intereses:      cleanNumeric(row[10]),
+              cuotas_extraordinarias: cleanNumeric(row[11]),
+              multas:                cleanNumeric(row[12]),
+              adeudo_total:          adeudoTotal,
+              motivo_adeudo:         cleanText(row[14]),
+              nivel_disposicion:     cleanText(row[18]),
+              probabilidad:          cleanText(row[19]),
+              _sheetName:            sheetName
+            });
+          }
+        }
+
+        if (allRows.length === 0) {
+          showError('No se encontraron filas válidas en el archivo. Verifica que el formato sea correcto.');
+          btnProcessEl.disabled = false;
+          btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
+          hide(progressEl);
+          return;
+        }
+
+        progressTextEl.textContent = `Se encontraron ${allRows.length} filas válidas. Iniciando carga...`;
+
+        // ── Paso 3: Upsert a Supabase fila por fila ───────────
+        let inserted = 0;
+        let updated  = 0;
+        let errors   = 0;
+        const errorMessages = [];
+
+        for (let i = 0; i < allRows.length; i++) {
+          const row = allRows[i];
+
+          // Actualizar progreso en UI
+          const pct = Math.round(((i + 1) / allRows.length) * 100);
+          progressBarEl.style.width = pct + '%';
+          progressTextEl.textContent = `Procesando fila ${i + 1} de ${allRows.length}...`;
+
+          // Generar ID único: DEU-YYYYMMDDHHMMSS-Lote
+          const now = new Date();
+          const ts = now.getFullYear().toString()
+            + String(now.getMonth() + 1).padStart(2, '0')
+            + String(now.getDate()).padStart(2, '0')
+            + String(now.getHours()).padStart(2, '0')
+            + String(now.getMinutes()).padStart(2, '0')
+            + String(now.getSeconds()).padStart(2, '0');
+          const loteId = (row.lote || 'SL').replace(/\s+/g, '');
+          const idDeudor = `DEU-${ts}-${loteId}`;
+
+          const today = now.toISOString().split('T')[0];
+
+          // Preparar registro para Supabase
+          const record = {
+            nombre:                row.propietario,
+            lote:                  row.lote,
+            tipo:                  row.casa_lote,
+            correo:                row.correo,
+            telefono:              row.telefono,
+            habitan:               row.habitan,
+            residente_inquilino:   row.residente_inquilino,
+            meses_atraso:          row.meses_atraso,
+            adeudo_mantenimiento:  row.adeudo_mantenimiento,
+            adeudo_intereses:      row.adeudo_intereses,
+            cuotas_extraordinarias: row.cuotas_extraordinarias,
+            multas:                row.multas,
+            adeudo_total:          row.adeudo_total,
+            motivo_adeudo:         row.motivo_adeudo,
+            nivel_disposicion:     row.nivel_disposicion,
+            probabilidad:          row.probabilidad,
+            id_condominio:         condominioId,
+            fecha_actualizacion:   today
+          };
+
+          try {
+            // ── Verificar si ya existe un registro con mismo lote + condominio ──
+            const { data: existing, error: selectError } = await supabase
+              .from('deudores')
+              .select('id_deudor')
+              .eq('lote', row.lote)
+              .eq('id_condominio', condominioId)
+              .maybeSingle();
+
+            if (selectError) throw selectError;
+
+            if (existing) {
+              // ── UPDATE: el registro ya existe ──
+              const { error: updateError } = await supabase
+                .from('deudores')
+                .update(record)
+                .eq('id_deudor', existing.id_deudor);
+
+              if (updateError) throw updateError;
+              updated++;
+            } else {
+              // ── INSERT: registro nuevo ──
+              record.id_deudor = idDeudor;
+              record.estado_contacto = 'Pendiente';
+              record.fecha_alta = today;
+
+              const { error: insertError } = await supabase
+                .from('deudores')
+                .insert(record);
+
+              if (insertError) throw insertError;
+              inserted++;
+            }
+          } catch (err) {
+            errors++;
+            const msg = `Fila ${i + 1} (${row.propietario || '?'}, Lote ${row.lote || '?'}): ${err.message || err}`;
+            errorMessages.push(msg);
+            // Continuar con las demás filas — nunca detener el proceso
+          }
+
+          // Ceder el hilo para que el navegador actualice la UI
+          if (i % 5 === 0) {
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+
+        // ── Paso 4: Mostrar resultados ────────────────────────
+        progressBarEl.style.width = '100%';
+        progressTextEl.textContent = '¡Proceso completado!';
+
+        countInsertedEl.textContent = inserted;
+        countUpdatedEl.textContent  = updated;
+        countErrorsEl.textContent   = errors;
+        show(resultsEl);
+
+        // Mostrar log de errores si los hubo
+        if (errorMessages.length > 0) {
+          errorLogEl.innerHTML = errorMessages
+            .map(m => `• ${m}`)
+            .join('<br>');
+          show(errorLogEl);
+        }
+
+      } catch (err) {
+        // Error crítico (lectura del archivo, etc.)
+        showError(`Error inesperado: ${err.message || err}`);
+        hide(progressEl);
+      }
+
+      // Restaurar botón
+      btnProcessEl.disabled = false;
+      btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
+    }
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       INSTRUCCIONES DE DESPLIEGUE — Railway + GitHub
+       ═══════════════════════════════════════════════════════════
+       
+       PASO 1: Crea un repositorio en GitHub y sube este archivo
+               como index.html en la raíz del proyecto.
+       
+       PASO 2: Ve a https://railway.app, inicia sesión con tu
+               cuenta de GitHub y crea un nuevo proyecto:
+               "New Project" → "Deploy from GitHub Repo" →
+               selecciona tu repositorio.
+       
+       PASO 3: Railway detectará que es un sitio estático.
+               Si no lo detecta automáticamente, agrega un
+               Nixpacks config o usa el servicio "Static" con:
+                 - Build command:  (vacío)
+                 - Start command:  npx serve .
+               Railway asignará un dominio público automáticamente.
+       
+       NOTA:   Cada push a la rama main desplegará
+               automáticamente la nueva versión.
+       
+       ALTERNATIVA: Abre este archivo directamente en Chrome
+                    (doble clic) para uso local sin servidor.
+       ═══════════════════════════════════════════════════════════ -->
+</body>
+</html>
