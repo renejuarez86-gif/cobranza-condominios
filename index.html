@@ -546,16 +546,37 @@
             blankrows: false  // Omitir filas completamente vacías
           });
 
-          // Saltar las primeras 5 filas (headers están en fila 6, índice 5)
-          // La fila 6 (índice 5) es el header — los datos empiezan en índice 6
-          const dataRows = rawRows.slice(6);
+          // Buscar la fila de encabezados (la que contiene "Propietario")
+          let headerIndex = -1;
+          for (let r = 0; r < Math.min(rawRows.length, 20); r++) {
+            const row = rawRows[r];
+            if (row && row.some(cell => typeof cell === 'string' && cell.toLowerCase().includes('propietario'))) {
+              headerIndex = r;
+              break;
+            }
+          }
+
+          // Si no encontramos la fila de encabezados en esta hoja, la saltamos
+          if (headerIndex === -1) {
+            console.warn(`Hoja "${sheetName}" ignorada: no se encontró la columna "Propietario" en las primeras 20 filas.`);
+            continue;
+          }
+
+          // Los datos empiezan justo debajo de los encabezados
+          const dataRows = rawRows.slice(headerIndex + 1);
 
           for (const row of dataRows) {
             const propietario  = cleanText(row[3]);
             const adeudoTotal  = cleanNumeric(row[13]);
 
             // Filtrar filas sin Propietario o sin Adeudo Total
-            if (!propietario || adeudoTotal === null) continue;
+            if (!propietario) {
+              continue;
+            }
+            if (adeudoTotal === null) {
+              console.warn(`Fila ignorada en hoja "${sheetName}" (Propietario: ${propietario}): no tiene "Adeudo Total" en la columna N.`);
+              continue;
+            }
 
             allRows.push({
               lote:                  cleanText(row[1]) || cleanText(row[2]),
