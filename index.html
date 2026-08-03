@@ -479,14 +479,25 @@
     // DRAG & DROP + SELECCIÓN DE ARCHIVO
     // ─────────────────────────────────────────────────────────────
 
-    // Prevenir que el navegador abra el archivo al soltarlo
-    document.addEventListener('dragover', (e) => e.preventDefault());
-    document.addEventListener('drop', (e) => e.preventDefault());
+    // Bloquear TODA acción por defecto del navegador al arrastrar
+    // archivos (evita el diálogo "Guardar como").
+    // Se usa capture: true para interceptar ANTES que cualquier otro handler.
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evtName => {
+      window.addEventListener(evtName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, { capture: true });
+    });
 
     // Resaltar la zona al arrastrar un archivo sobre ella
+    dropzoneEl.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dropzoneEl.classList.add('dragover');
+    });
+
     dropzoneEl.addEventListener('dragover', (e) => {
       e.preventDefault();
-      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
       dropzoneEl.classList.add('dragover');
     });
 
@@ -498,7 +509,6 @@
     // Soltar archivo
     dropzoneEl.addEventListener('drop', (e) => {
       e.preventDefault();
-      e.stopPropagation();
       dropzoneEl.classList.remove('dragover');
       const files = e.dataTransfer.files;
       if (files.length > 0) handleFileSelection(files[0]);
