@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Cobranza — Carga de Deudores</title>
-  <meta name="description" content="Herramienta interna para administradores de condominios. Carga masiva de deudores desde Excel a Supabase.">
+  <title>Portal de Administradores — Sistema de Cobranza</title>
+  <meta name="description" content="Portal para administradores de condominios: ver estado de cuenta y subir el archivo mensual de morosidad.">
 
   <!-- ═══════════════════════════════════════════════════════════
        DEPENDENCIAS CDN
@@ -16,53 +16,98 @@
        ESTILOS — Todo inline para archivo único
        ═══════════════════════════════════════════════════════════ -->
   <style>
-    /* ── Reset y base ────────────────────────────────────────── */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: #f8faf9;
       color: #1e293b;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem 1rem;
     }
 
     /* ── Header ──────────────────────────────────────────────── */
-    .header {
-      text-align: center;
-      margin-bottom: 2rem;
+    .topbar {
+      background: #064e3b;
+      color: #fff;
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-
-    .header h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: #064e3b;
-      letter-spacing: -0.02em;
+    .topbar h1 { font-size: 17px; font-weight: 700; }
+    .topbar .sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+    #logoutBtn {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.35);
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      display: none;
     }
+    #logoutBtn:hover { background: rgba(255,255,255,.22); }
 
-    .header p {
-      font-size: 0.9rem;
-      color: #64748b;
-      margin-top: 0.35rem;
-    }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
 
-    /* ── Tarjeta principal ───────────────────────────────────── */
+    /* ── Tarjeta / secciones ─────────────────────────────────── */
     .card {
       background: #ffffff;
       border-radius: 16px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06);
-      padding: 2.5rem;
+      padding: 2rem 2.25rem;
       width: 100%;
-      max-width: 640px;
+      margin-bottom: 1.75rem;
     }
+    .card h2, .card h3 { color: #064e3b; margin-bottom: .6rem; }
+    .card h3 { font-size: 16px; }
+    .card p.hint { color: #64748b; font-size: 13px; margin-bottom: 1rem; }
 
+    /* ── LOGIN ───────────────────────────────────────────────── */
+    #loginScreen { max-width: 380px; margin: 90px auto; }
+    label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: #1e293b; }
+    input[type=email], input[type=password], input[type=file] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #dde4ea;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    button.primary {
+      background: #064e3b;
+      color: #fff;
+      border: none;
+      padding: 11px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 18px;
+      width: 100%;
+    }
+    button.primary:hover { background: #022c22; }
+    #loginError { color: #b91c1c; font-size: 13px; margin-top: 10px; display: none; }
+
+    /* ── DASHBOARD ───────────────────────────────────────────── */
+    #app { display: none; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 1.75rem; }
+    .stat { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 16px; }
+    .stat .num { font-size: 26px; font-weight: 700; color: #064e3b; }
+    .stat .label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+    th { color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+    tr:last-child td { border-bottom: none; }
+    .tablewrap { max-height: 320px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .empty { color: #64748b; font-size: 13px; padding: 10px 0; }
+
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .badge.ok { background: #ecfdf5; color: #10b981; }
+    .badge.pend { background: #fef3e2; color: #9a6b00; }
+    .badge.neutral { background: #eef2f6; color: #064e3b; }
+
+    /* ── SUBIR ARCHIVO (misma lógica de siempre) ───────────────── */
     .file-selection-area {
       text-align: center;
       padding: 2rem 1rem;
@@ -71,693 +116,550 @@
       border-radius: 12px;
       margin-bottom: 1rem;
     }
-
     .btn-select-file {
       display: inline-block;
-      padding: 0.85rem 1.5rem;
+      padding: .85rem 1.5rem;
       background: #064e3b;
-      color: white;
+      color: #fff;
       border-radius: 8px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
       font-size: 1rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: .75rem;
     }
+    .btn-select-file:hover { background: #022c22; }
+    .file-hint { display: block; font-size: .85rem; color: #64748b; }
+    #fileInput { display: none; }
 
-    .btn-select-file:hover {
-      background: #022c22;
-    }
-
-    .file-hint {
-      display: block;
-      font-size: 0.85rem;
-      color: #64748b;
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    /* ── Indicador de archivo seleccionado ────────────────────── */
-    .file-info {
-      display: none;
-      align-items: center;
-      gap: 0.75rem;
-      margin-top: 1.25rem;
-      padding: 0.85rem 1rem;
-      background: #f0fdf4;
-      border-radius: 10px;
-      border: 1px solid #a7f3d0;
-    }
-
+    .file-info { display: none; align-items: center; gap: .75rem; margin-top: 1.25rem; padding: .85rem 1rem; background: #f0fdf4; border-radius: 10px; border: 1px solid #a7f3d0; }
     .file-info.visible { display: flex; }
+    .file-info-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .file-info-details { flex: 1; min-width: 0; }
+    .file-info-name { font-weight: 600; font-size: .88rem; color: #064e3b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-info-meta { font-size: .78rem; color: #64748b; }
 
-    .file-info-icon {
-      font-size: 1.4rem;
-      flex-shrink: 0;
-    }
-
-    .file-info-details {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .file-info-name {
-      font-weight: 600;
-      font-size: 0.88rem;
-      color: #064e3b;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .file-info-meta {
-      font-size: 0.78rem;
-      color: #64748b;
-    }
-
-    /* ── Botón procesar ──────────────────────────────────────── */
     .btn-process {
-      display: none;
-      width: 100%;
-      margin-top: 1.25rem;
-      padding: 0.85rem;
-      border: none;
-      border-radius: 10px;
-      background: #10b981;
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      display: none; width: 100%; margin-top: 1.25rem; padding: .85rem; border: none; border-radius: 10px;
+      background: #10b981; color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer;
     }
-
     .btn-process:hover { background: #059669; }
-    .btn-process:active { transform: scale(0.985); }
-    .btn-process:disabled {
-      background: #94a3b8;
-      cursor: not-allowed;
-      transform: none;
-    }
-
+    .btn-process:disabled { background: #94a3b8; cursor: not-allowed; }
     .btn-process.visible { display: block; }
 
-    /* ── Barra de progreso ───────────────────────────────────── */
-    .progress-section {
-      display: none;
-      margin-top: 1.5rem;
-    }
-
+    .progress-section { display: none; margin-top: 1.5rem; }
     .progress-section.visible { display: block; }
+    .progress-text { font-size: .85rem; color: #475569; margin-bottom: .5rem; min-height: 1.3em; }
+    .progress-bar-track { width: 100%; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 99px; transition: width .15s ease; }
 
-    .progress-text {
-      font-size: 0.85rem;
-      color: #475569;
-      margin-bottom: 0.5rem;
-      min-height: 1.3em;
-    }
-
-    .progress-bar-track {
-      width: 100%;
-      height: 8px;
-      background: #e2e8f0;
-      border-radius: 99px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #10b981, #34d399);
-      border-radius: 99px;
-      transition: width 0.15s ease;
-    }
-
-    /* ── Resumen de resultados ────────────────────────────────── */
-    .results {
-      display: none;
-      margin-top: 1.5rem;
-      padding: 1.25rem;
-      border-radius: 10px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-    }
-
+    .results { display: none; margin-top: 1.5rem; padding: 1.25rem; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; }
     .results.visible { display: block; }
-
-    .results h3 {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #064e3b;
-      margin-bottom: 0.75rem;
-    }
-
-    .results-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.75rem;
-    }
-
-    .result-item {
-      text-align: center;
-      padding: 0.6rem;
-      border-radius: 8px;
-    }
-
+    .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+    .result-item { text-align: center; padding: .6rem; border-radius: 8px; }
     .result-item.inserted { background: #ecfdf5; }
     .result-item.updated { background: #eff6ff; }
     .result-item.errors { background: #fef2f2; }
-
-    .result-number {
-      font-size: 1.6rem;
-      font-weight: 700;
-      display: block;
-    }
-
+    .result-number { font-size: 1.6rem; font-weight: 700; display: block; }
     .result-item.inserted .result-number { color: #10b981; }
     .result-item.updated .result-number { color: #3b82f6; }
     .result-item.errors .result-number { color: #ef4444; }
+    .result-label { font-size: .75rem; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 
-    .result-label {
-      font-size: 0.75rem;
-      color: #64748b;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    /* ── Log de errores ──────────────────────────────────────── */
-    .error-log {
-      display: none;
-      margin-top: 1rem;
-      max-height: 180px;
-      overflow-y: auto;
-      font-size: 0.78rem;
-      color: #dc2626;
-      background: #fff5f5;
-      border: 1px solid #fecaca;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      line-height: 1.6;
-    }
-
+    .error-log { display: none; margin-top: 1rem; max-height: 180px; overflow-y: auto; font-size: .78rem; color: #dc2626; background: #fff5f5; border: 1px solid #fecaca; border-radius: 8px; padding: .75rem 1rem; line-height: 1.6; }
     .error-log.visible { display: block; }
 
-    /* ── Alertas / errores globales ───────────────────────────── */
-    .alert {
-      display: none;
-      margin-top: 1.25rem;
-      padding: 0.85rem 1rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-
+    .alert { display: none; margin-top: 1.25rem; padding: .85rem 1rem; border-radius: 10px; font-size: .85rem; font-weight: 500; }
     .alert.visible { display: block; }
+    .alert-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 
-    .alert-error {
-      background: #fef2f2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-    }
-
-    /* ── Footer ──────────────────────────────────────────────── */
-    .footer {
-      margin-top: 2rem;
-      font-size: 0.75rem;
-      color: #94a3b8;
-      text-align: center;
-    }
+    .footer { margin: 2rem 0 1rem; font-size: .75rem; color: #94a3b8; text-align: center; }
   </style>
 </head>
 <body>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       MARKUP — Interfaz de la herramienta
-       ═══════════════════════════════════════════════════════════ -->
-  <header class="header">
-    <h1>📋 Subir Archivo de Morosidad</h1>
-    <p>Sube el archivo Excel de recuperación de cartera</p>
-  </header>
+<div class="topbar">
+  <div>
+    <h1>Portal de Administradores</h1>
+    <div class="sub">Sistema de Cobranza</div>
+  </div>
+  <button id="logoutBtn">Cerrar sesión</button>
+</div>
 
-  <main class="card">
-    <!-- Zona de selección de archivo simple -->
-    <div class="file-selection-area">
-      <label for="fileInput" class="btn-select-file">
-        📂 Seleccionar Archivo Excel
-      </label>
-      <span class="file-hint">Formato aceptado: .xlsx</span>
-      <input type="file" id="fileInput" accept=".xlsx">
+<div class="wrap">
+
+  <!-- ===================== LOGIN ===================== -->
+  <div id="loginScreen" class="card">
+    <h2>Iniciar sesión</h2>
+    <p class="hint">Ingresa con el correo y contraseña que te compartieron.</p>
+    <label for="email">Correo electrónico</label>
+    <input type="email" id="email" placeholder="tu@correo.com" />
+    <label for="password">Contraseña</label>
+    <input type="password" id="password" placeholder="••••••••" />
+    <button class="primary" id="loginBtn">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+
+  <!-- ===================== APP ===================== -->
+  <div id="app">
+
+    <div class="cards" id="statCards">
+      <div class="stat"><div class="num" id="statTotal">–</div><div class="label">Residentes con adeudo</div></div>
+      <div class="stat"><div class="num" id="statNegociacion">–</div><div class="label">En negociación</div></div>
+      <div class="stat"><div class="num" id="statEspera">–</div><div class="label">Convenios esperando firma</div></div>
+      <div class="stat"><div class="num" id="statFirmado">–</div><div class="label">Convenios firmados</div></div>
     </div>
 
-    <!-- Info del archivo seleccionado -->
-    <div class="file-info" id="fileInfo">
-      <span class="file-info-icon">📊</span>
-      <div class="file-info-details">
-        <div class="file-info-name" id="fileName">—</div>
-        <div class="file-info-meta" id="fileMeta">—</div>
+    <div class="card">
+      <h3>Residentes con saldo pendiente</h3>
+      <div class="tablewrap" id="deudoresTableWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+    <div class="card">
+      <h3>Convenios de pago</h3>
+      <div class="tablewrap" id="conveniosTableWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+    <div class="card">
+      <h3>📋 Subir archivo mensual de morosidad</h3>
+      <p class="hint">Sube el archivo Excel (.xlsx) de recuperación de cartera de tu condominio. Los residentes se agregarán o actualizarán automáticamente — nunca se tocan los datos de otros condominios.</p>
+
+      <div class="file-selection-area">
+        <label for="fileInput" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
+        <span class="file-hint">Formato aceptado: .xlsx</span>
+        <input type="file" id="fileInput" accept=".xlsx">
       </div>
-    </div>
 
-    <!-- Botón procesar -->
-    <button class="btn-process" id="btnProcess">🚀 Procesar y cargar a Supabase</button>
-
-    <!-- Alerta de error global -->
-    <div class="alert alert-error" id="alertError"></div>
-
-    <!-- Sección de progreso -->
-    <div class="progress-section" id="progressSection">
-      <div class="progress-text" id="progressText">Preparando...</div>
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill" id="progressBar"></div>
-      </div>
-    </div>
-
-    <!-- Resumen de resultados -->
-    <div class="results" id="results">
-      <h3>✅ Proceso completado</h3>
-      <div class="results-grid">
-        <div class="result-item inserted">
-          <span class="result-number" id="countInserted">0</span>
-          <span class="result-label">Nuevos</span>
-        </div>
-        <div class="result-item updated">
-          <span class="result-number" id="countUpdated">0</span>
-          <span class="result-label">Actualizados</span>
-        </div>
-        <div class="result-item errors">
-          <span class="result-number" id="countErrors">0</span>
-          <span class="result-label">Errores</span>
+      <div class="file-info" id="fileInfo">
+        <span class="file-info-icon">📊</span>
+        <div class="file-info-details">
+          <div class="file-info-name" id="fileName">—</div>
+          <div class="file-info-meta" id="fileMeta">—</div>
         </div>
       </div>
+
+      <button class="btn-process" id="btnProcess">🚀 Procesar y cargar a Supabase</button>
+
+      <div class="alert alert-error" id="alertError"></div>
+
+      <div class="progress-section" id="progressSection">
+        <div class="progress-text" id="progressText">Preparando...</div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBar"></div></div>
+      </div>
+
+      <div class="results" id="results">
+        <h3>✅ Proceso completado</h3>
+        <div class="results-grid">
+          <div class="result-item inserted"><span class="result-number" id="countInserted">0</span><span class="result-label">Nuevos</span></div>
+          <div class="result-item updated"><span class="result-number" id="countUpdated">0</span><span class="result-label">Actualizados</span></div>
+          <div class="result-item errors"><span class="result-number" id="countErrors">0</span><span class="result-label">Errores</span></div>
+        </div>
+      </div>
+
+      <div class="error-log" id="errorLog"></div>
     </div>
 
-    <!-- Log detallado de errores -->
-    <div class="error-log" id="errorLog"></div>
-  </main>
+  </div>
 
-  <footer class="footer">
-    Sistema interno de administración de condominios · v1.0
-  </footer>
+  <div class="footer">Sistema interno de administración de condominios · v2.0 — con acceso por administrador</div>
+</div>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       JAVASCRIPT — Toda la lógica de negocio
-       ═══════════════════════════════════════════════════════════ -->
-  <script>
-    // ─────────────────────────────────────────────────────────────
-    // CREDENCIALES SUPABASE — Reemplazar con valores reales
-    // ─────────────────────────────────────────────────────────────
-    const SUPABASE_URL  = 'https://huwnwisvbbvrpiorrcdx.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_-QaNjJds8rO31NqFeinfGQ_eeVtk5bI';
+<script>
+  // ══════════════════════════════════════════════════════════
+  // CONFIGURACIÓN — mismos valores que ya usa tu app en Railway
+  // (Supabase > Project Settings > API)
+  // ══════════════════════════════════════════════════════════
+  const SUPABASE_URL  = 'https://huwnwisvbbvrpiorrcdx.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_-QaNjJds8rO31NqFeinfGQ_eeVtk5bI';
 
-    // Inicializar cliente Supabase
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ─────────────────────────────────────────────────────────────
-    // REFERENCIAS AL DOM
-    // ─────────────────────────────────────────────────────────────
-    const fileInputEl    = document.getElementById('fileInput');
-    const fileInfoEl     = document.getElementById('fileInfo');
-    const fileNameEl     = document.getElementById('fileName');
-    const fileMetaEl     = document.getElementById('fileMeta');
-    const btnProcessEl   = document.getElementById('btnProcess');
-    const alertErrorEl   = document.getElementById('alertError');
-    const progressEl     = document.getElementById('progressSection');
-    const progressTextEl = document.getElementById('progressText');
-    const progressBarEl  = document.getElementById('progressBar');
-    const resultsEl      = document.getElementById('results');
-    const countInsertedEl = document.getElementById('countInserted');
-    const countUpdatedEl  = document.getElementById('countUpdated');
-    const countErrorsEl   = document.getElementById('countErrors');
-    const errorLogEl      = document.getElementById('errorLog');
+  let currentCondoId = null;
+  let selectedFile = null;
 
-    // Estado global
-    let selectedFile  = null;
-    let condominioId  = '';
+  const $ = (id) => document.getElementById(id);
+  function show(el) { el.classList.add('visible'); }
+  function hide(el) { el.classList.remove('visible'); }
 
-    // ─────────────────────────────────────────────────────────────
-    // UTILIDADES
-    // ─────────────────────────────────────────────────────────────
+  // ── LOGIN ──────────────────────────────────────────────────
+  $('loginBtn').addEventListener('click', async () => {
+    $('loginError').style.display = 'none';
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    if (!email || !password) { return showLoginError('Escribe tu correo y tu contraseña.'); }
 
-    /** Muestra u oculta un elemento con la clase 'visible' */
-    function show(el) { el.classList.add('visible'); }
-    function hide(el) { el.classList.remove('visible'); }
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) { return showLoginError('No pudimos iniciar sesión. Revisa tu correo y contraseña.'); }
+    await afterLogin();
+  });
 
-    /** Muestra un error global en la interfaz */
-    function showError(msg) {
-      alertErrorEl.textContent = msg;
-      show(alertErrorEl);
+  function showLoginError(msg) {
+    $('loginError').textContent = msg;
+    $('loginError').style.display = 'block';
+  }
+
+  $('logoutBtn').addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    location.reload();
+  });
+
+  async function checkSession() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session) await afterLogin();
+  }
+
+  async function afterLogin() {
+    const { data: userData } = await supabaseClient.auth.getUser();
+    const uid = userData.user.id;
+
+    const { data: adminRow, error: adminErr } = await supabaseClient
+      .from('administradores')
+      .select('id_condominio, nombre')
+      .eq('user_id', uid)
+      .maybeSingle();
+
+    if (adminErr || !adminRow) {
+      showLoginError('Tu usuario no está vinculado a ningún condominio todavía. Avisa al equipo técnico.');
+      await supabaseClient.auth.signOut();
+      return;
     }
 
-    /** Oculta el error global */
-    function hideError() { hide(alertErrorEl); }
+    currentCondoId = adminRow.id_condominio;
 
-    /** Resetea toda la sección de resultados y progreso */
-    function resetResults() {
-      hide(resultsEl);
-      hide(progressEl);
-      hide(errorLogEl);
-      hideError();
-      progressBarEl.style.width = '0%';
-      errorLogEl.innerHTML = '';
+    $('loginScreen').style.display = 'none';
+    $('app').style.display = 'block';
+    $('logoutBtn').style.display = 'inline-block';
+
+    await loadDashboard();
+  }
+
+  // ── DASHBOARD ──────────────────────────────────────────────
+  async function loadDashboard() {
+    const { data: deudores } = await supabaseClient
+      .from('deudores')
+      .select('nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto')
+      .eq('id_condominio', currentCondoId);
+
+    const { data: convenios } = await supabaseClient
+      .from('convenios')
+      .select('nombre_deudor, unidad, num_mensualidades, monto_mensualidad, monto_total, estado, fecha_actualizacion')
+      .eq('id_condominio', currentCondoId)
+      .order('fecha_actualizacion', { ascending: false });
+
+    renderStats(deudores || [], convenios || []);
+    renderDeudoresTable(deudores || []);
+    renderConveniosTable(convenios || []);
+  }
+
+  function renderStats(deudores, convenios) {
+    $('statTotal').textContent = deudores.length;
+    $('statNegociacion').textContent = deudores.filter(d => d.estado_contacto === 'En_Negociacion').length;
+    $('statEspera').textContent = convenios.filter(c => c.estado === 'Convenio_Enviado_Espera_Firma').length;
+    $('statFirmado').textContent = convenios.filter(c => c.estado === 'Convenio_Firmado').length;
+  }
+
+  function estadoBadge(estado) {
+    const map = {
+      'Convenio_Firmado': 'ok',
+      'Pagado': 'ok',
+      'Pendiente': 'neutral',
+      'En_Negociacion': 'neutral',
+      'Convenio_Enviado_Espera_Firma': 'pend',
+      'Pago_Reportado': 'pend',
+      'En_Proceso_Pago': 'pend',
+      'Escalar_Abogado': 'pend',
+    };
+    const cls = map[estado] || 'neutral';
+    return `<span class="badge ${cls}">${estado || '—'}</span>`;
+  }
+
+  function renderDeudoresTable(rows) {
+    const wrap = $('deudoresTableWrap');
+    if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados en tu condominio.</p>'; return; }
+    let html = '<table><thead><tr><th>Nombre</th><th>Lote</th><th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th></tr></thead><tbody>';
+    for (const d of rows) {
+      html += `<tr>
+        <td>${escapeHtml(d.nombre)}</td>
+        <td>${escapeHtml(d.lote)}</td>
+        <td>$${Number(d.adeudo_total || 0).toLocaleString()}</td>
+        <td>${escapeHtml(d.meses_atraso ?? '—')}</td>
+        <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
+        <td>${escapeHtml(d.nivel_disposicion || '—')}</td>
+        <td>${estadoBadge(d.estado_contacto)}</td>
+      </tr>`;
     }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
 
-    /**
-     * Extrae el ID del condominio desde el nombre del archivo.
-     * Busca la última parte del nombre (después del último _)
-     * y le quita la extensión.
-     * Ej: RECUPERACION_DE_CARTERA_ALBA.xlsx → "alba"
-     * Ej: REPORTE.xlsx → "reporte"
-     */
-    function extractCondominioId(filename) {
-      // Quitar extensión
-      const sinExt = filename.replace(/\.xlsx$/i, '');
-      // Tomar la parte después del último guión bajo
-      const parts = sinExt.split('_');
-      const id = parts[parts.length - 1];
-      return id.toLowerCase().trim();
+  function renderConveniosTable(rows) {
+    const wrap = $('conveniosTableWrap');
+    if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay convenios registrados en tu condominio.</p>'; return; }
+    let html = '<table><thead><tr><th>Residente</th><th>Unidad</th><th>Mensualidades</th><th>Monto mensual</th><th>Estado</th><th>Última actualización</th></tr></thead><tbody>';
+    for (const c of rows) {
+      html += `<tr>
+        <td>${escapeHtml(c.nombre_deudor)}</td>
+        <td>${escapeHtml(c.unidad)}</td>
+        <td>${c.num_mensualidades ?? '—'}</td>
+        <td>$${Number(c.monto_mensualidad || 0).toLocaleString()}</td>
+        <td>${estadoBadge(c.estado)}</td>
+        <td>${c.fecha_actualizacion ? new Date(c.fecha_actualizacion).toLocaleDateString() : '—'}</td>
+      </tr>`;
     }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
 
-    /** Formatea bytes a tamaño legible */
-    function formatFileSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / 1048576).toFixed(1) + ' MB';
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ── SELECCIÓN DE ARCHIVO (misma lógica de siempre) ──────────
+  const fileInputEl    = $('fileInput');
+  const fileInfoEl     = $('fileInfo');
+  const fileNameEl     = $('fileName');
+  const fileMetaEl     = $('fileMeta');
+  const btnProcessEl   = $('btnProcess');
+  const alertErrorEl   = $('alertError');
+  const progressEl     = $('progressSection');
+  const progressTextEl = $('progressText');
+  const progressBarEl  = $('progressBar');
+  const resultsEl      = $('results');
+  const countInsertedEl = $('countInserted');
+  const countUpdatedEl  = $('countUpdated');
+  const countErrorsEl   = $('countErrors');
+  const errorLogEl      = $('errorLog');
+
+  function showError(msg) { alertErrorEl.textContent = msg; show(alertErrorEl); }
+  function hideError() { hide(alertErrorEl); }
+  function resetResults() {
+    hide(resultsEl); hide(progressEl); hide(errorLogEl); hideError();
+    progressBarEl.style.width = '0%';
+    errorLogEl.innerHTML = '';
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function cleanNumeric(val) {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/[$,\s]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  }
+
+  function cleanText(val) {
+    if (val === null || val === undefined) return null;
+    const s = String(val).trim();
+    return s === '' ? null : s;
+  }
+
+  fileInputEl.addEventListener('click', function(e) { e.target.value = ''; });
+  fileInputEl.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) handleFileSelection(e.target.files[0]);
+  });
+
+  function handleFileSelection(file) {
+    resetResults();
+    hideError();
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      showError('Solo se aceptan archivos .xlsx');
+      selectedFile = null;
+      hide(fileInfoEl); hide(btnProcessEl);
+      return;
     }
+    selectedFile = file;
+    fileNameEl.textContent = file.name;
+    // El condominio ya NO se adivina del nombre del archivo — siempre es el tuyo, el de tu sesión.
+    fileMetaEl.textContent = `${formatFileSize(file.size)} · Se cargará a tu condominio: ${(currentCondoId || '').toUpperCase()}`;
+    show(fileInfoEl); show(btnProcessEl);
+  }
 
-    /**
-     * Limpia un valor numérico del Excel.
-     * Quita símbolos de moneda, comas, y convierte a número.
-     * Retorna null si no es un número válido.
-     */
-    function cleanNumeric(val) {
-      if (val === null || val === undefined || val === '') return null;
-      if (typeof val === 'number') return val;
-      const cleaned = String(val).replace(/[$,\s]/g, '');
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? null : num;
-    }
+  btnProcessEl.addEventListener('click', () => processFile());
 
-    /** Convierte cualquier valor a string limpio, o null si está vacío */
-    function cleanText(val) {
-      if (val === null || val === undefined) return null;
-      const s = String(val).trim();
-      return s === '' ? null : s;
-    }
+  async function processFile() {
+    if (!selectedFile) return;
 
-    // ─────────────────────────────────────────────────────────────
-    // SELECCIÓN DE ARCHIVO
-    // ─────────────────────────────────────────────────────────────
+    btnProcessEl.disabled = true;
+    btnProcessEl.textContent = '⏳ Procesando...';
+    resetResults();
+    show(progressEl);
+    progressTextEl.textContent = 'Leyendo archivo Excel...';
 
-    // Permitir seleccionar el mismo archivo varias veces limpiando el valor previo
-    fileInputEl.addEventListener('click', function(e) {
-      e.target.value = '';
-    });
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const allRows = [];
 
-    // Cuando el usuario selecciona un archivo con el botón
-    fileInputEl.addEventListener('change', (e) => {
-      console.log('Evento change disparado. Archivos:', e.target.files);
-      if (e.target.files && e.target.files.length > 0) {
-        handleFileSelection(e.target.files[0]);
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+
+        let headerIndex = -1;
+        for (let r = 0; r < Math.min(rawRows.length, 20); r++) {
+          const row = rawRows[r];
+          if (row && row.some(cell => typeof cell === 'string' && cell.toLowerCase().includes('propietario'))) {
+            headerIndex = r;
+            break;
+          }
+        }
+        if (headerIndex === -1) {
+          console.warn(`Hoja "${sheetName}" ignorada: no se encontró la columna "Propietario" en las primeras 20 filas.`);
+          continue;
+        }
+
+        const dataRows = rawRows.slice(headerIndex + 1);
+        for (const row of dataRows) {
+          const propietario = cleanText(row[3]);
+          const adeudoTotal  = cleanNumeric(row[13]);
+          if (!propietario) continue;
+          if (adeudoTotal === null) {
+            console.warn(`Fila ignorada en hoja "${sheetName}" (Propietario: ${propietario}): no tiene "Adeudo Total" en la columna N.`);
+            continue;
+          }
+          allRows.push({
+            lote:                  cleanText(row[1]) || cleanText(row[2]),
+            casa_lote:             cleanText(row[2]),
+            propietario:           propietario,
+            correo:                cleanText(row[4]),
+            telefono:              cleanText(row[5]),
+            habitan:               cleanText(row[6]),
+            residente_inquilino:   cleanText(row[7]),
+            meses_atraso:          cleanText(row[8]),
+            adeudo_mantenimiento:  cleanNumeric(row[9]),
+            adeudo_intereses:      cleanNumeric(row[10]),
+            cuotas_extraordinarias: cleanNumeric(row[11]),
+            multas:                cleanNumeric(row[12]),
+            adeudo_total:          adeudoTotal,
+            motivo_adeudo:         cleanText(row[14]),
+            nivel_disposicion:     cleanText(row[18]),
+            probabilidad:          cleanText(row[19]),
+            _sheetName:            sheetName
+          });
+        }
       }
-    });
 
-    /**
-     * Maneja la selección de archivo:
-     * - Valida extensión .xlsx
-     * - Extrae el ID del condominio
-     * - Muestra info del archivo en la UI
-     */
-    function handleFileSelection(file) {
-      resetResults();
-      hideError();
-
-      // Validar extensión
-      if (!file.name.toLowerCase().endsWith('.xlsx')) {
-        showError('Solo se aceptan archivos .xlsx');
-        selectedFile = null;
-        hide(fileInfoEl);
-        hide(btnProcessEl);
+      if (allRows.length === 0) {
+        showError('No se encontraron filas válidas en el archivo. Verifica que el formato sea correcto.');
+        btnProcessEl.disabled = false;
+        btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
+        hide(progressEl);
         return;
       }
 
-      selectedFile = file;
-      condominioId = extractCondominioId(file.name);
+      progressTextEl.textContent = `Se encontraron ${allRows.length} filas válidas. Iniciando carga...`;
 
-      // Mostrar información del archivo
-      fileNameEl.textContent = file.name;
-      fileMetaEl.textContent = `${formatFileSize(file.size)} · Condominio: ${condominioId.toUpperCase()}`;
-      show(fileInfoEl);
-      show(btnProcessEl);
-    }
+      let inserted = 0, updated = 0, errors = 0;
+      const errorMessages = [];
 
-    // ─────────────────────────────────────────────────────────────
-    // PROCESAMIENTO DEL EXCEL
-    // ─────────────────────────────────────────────────────────────
+      for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        const pct = Math.round(((i + 1) / allRows.length) * 100);
+        progressBarEl.style.width = pct + '%';
+        progressTextEl.textContent = `Procesando fila ${i + 1} de ${allRows.length}...`;
 
-    btnProcessEl.addEventListener('click', () => processFile());
+        const now = new Date();
+        const ts = now.getFullYear().toString()
+          + String(now.getMonth() + 1).padStart(2, '0')
+          + String(now.getDate()).padStart(2, '0')
+          + String(now.getHours()).padStart(2, '0')
+          + String(now.getMinutes()).padStart(2, '0')
+          + String(now.getSeconds()).padStart(2, '0');
+        const loteId = (row.lote || 'SL').replace(/\s+/g, '');
+        const idDeudor = `DEU-${ts}-${loteId}`;
+        const today = now.toISOString().split('T')[0];
 
-    async function processFile() {
-      if (!selectedFile) return;
+        // id_condominio SIEMPRE es el de la sesión del administrador que subió el archivo —
+        // nunca se toma del nombre del archivo ni de ninguna columna, para que nadie pueda
+        // (ni por error) escribir datos en el condominio de otro.
+        const record = {
+          nombre:                row.propietario,
+          lote:                  row.lote,
+          tipo:                  row.casa_lote,
+          correo:                row.correo,
+          telefono:              row.telefono,
+          habitan:               row.habitan,
+          residente_inquilino:   row.residente_inquilino,
+          meses_atraso:          row.meses_atraso,
+          adeudo_mantenimiento:  row.adeudo_mantenimiento,
+          adeudo_intereses:      row.adeudo_intereses,
+          cuotas_extraordinarias: row.cuotas_extraordinarias,
+          multas:                row.multas,
+          adeudo_total:          row.adeudo_total,
+          motivo_adeudo:         row.motivo_adeudo,
+          nivel_disposicion:     row.nivel_disposicion,
+          probabilidad:          row.probabilidad,
+          id_condominio:         currentCondoId,
+          fecha_actualizacion:   today
+        };
 
-      // Deshabilitar botón y resetear UI
-      btnProcessEl.disabled = true;
-      btnProcessEl.textContent = '⏳ Procesando...';
-      resetResults();
-      show(progressEl);
-      progressTextEl.textContent = 'Leyendo archivo Excel...';
+        try {
+          const { data: existing, error: selectError } = await supabaseClient
+            .from('deudores')
+            .select('id_deudor')
+            .eq('lote', row.lote)
+            .eq('id_condominio', currentCondoId)
+            .maybeSingle();
 
-      try {
-        // ── Paso 1: Leer el archivo como ArrayBuffer ──────────
-        const data = await selectedFile.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
+          if (selectError) throw selectError;
 
-        // ── Paso 2: Extraer filas válidas de TODAS las hojas ──
-        const allRows = [];
-
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-
-          // Convertir hoja a array de arrays (incluye filas vacías)
-          const rawRows = XLSX.utils.sheet_to_json(sheet, {
-            header: 1,       // Devuelve arrays, no objetos
-            defval: null,    // Valor por defecto para celdas vacías
-            blankrows: false  // Omitir filas completamente vacías
-          });
-
-          // Buscar la fila de encabezados (la que contiene "Propietario")
-          let headerIndex = -1;
-          for (let r = 0; r < Math.min(rawRows.length, 20); r++) {
-            const row = rawRows[r];
-            if (row && row.some(cell => typeof cell === 'string' && cell.toLowerCase().includes('propietario'))) {
-              headerIndex = r;
-              break;
-            }
-          }
-
-          // Si no encontramos la fila de encabezados en esta hoja, la saltamos
-          if (headerIndex === -1) {
-            console.warn(`Hoja "${sheetName}" ignorada: no se encontró la columna "Propietario" en las primeras 20 filas.`);
-            continue;
-          }
-
-          // Los datos empiezan justo debajo de los encabezados
-          const dataRows = rawRows.slice(headerIndex + 1);
-
-          for (const row of dataRows) {
-            const propietario  = cleanText(row[3]);
-            const adeudoTotal  = cleanNumeric(row[13]);
-
-            // Filtrar filas sin Propietario o sin Adeudo Total
-            if (!propietario) {
-              continue;
-            }
-            if (adeudoTotal === null) {
-              console.warn(`Fila ignorada en hoja "${sheetName}" (Propietario: ${propietario}): no tiene "Adeudo Total" en la columna N.`);
-              continue;
-            }
-
-            allRows.push({
-              lote:                  cleanText(row[1]) || cleanText(row[2]),
-              casa_lote:             cleanText(row[2]),
-              propietario:           propietario,
-              correo:                cleanText(row[4]),
-              telefono:              cleanText(row[5]),
-              habitan:               cleanText(row[6]),
-              residente_inquilino:   cleanText(row[7]),
-              meses_atraso:          cleanText(row[8]),
-              adeudo_mantenimiento:  cleanNumeric(row[9]),
-              adeudo_intereses:      cleanNumeric(row[10]),
-              cuotas_extraordinarias: cleanNumeric(row[11]),
-              multas:                cleanNumeric(row[12]),
-              adeudo_total:          adeudoTotal,
-              motivo_adeudo:         cleanText(row[14]),
-              nivel_disposicion:     cleanText(row[18]),
-              probabilidad:          cleanText(row[19]),
-              _sheetName:            sheetName
-            });
-          }
-        }
-
-        if (allRows.length === 0) {
-          showError('No se encontraron filas válidas en el archivo. Verifica que el formato sea correcto.');
-          btnProcessEl.disabled = false;
-          btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
-          hide(progressEl);
-          return;
-        }
-
-        progressTextEl.textContent = `Se encontraron ${allRows.length} filas válidas. Iniciando carga...`;
-
-        // ── Paso 3: Upsert a Supabase fila por fila ───────────
-        let inserted = 0;
-        let updated  = 0;
-        let errors   = 0;
-        const errorMessages = [];
-
-        for (let i = 0; i < allRows.length; i++) {
-          const row = allRows[i];
-
-          // Actualizar progreso en UI
-          const pct = Math.round(((i + 1) / allRows.length) * 100);
-          progressBarEl.style.width = pct + '%';
-          progressTextEl.textContent = `Procesando fila ${i + 1} de ${allRows.length}...`;
-
-          // Generar ID único: DEU-YYYYMMDDHHMMSS-Lote
-          const now = new Date();
-          const ts = now.getFullYear().toString()
-            + String(now.getMonth() + 1).padStart(2, '0')
-            + String(now.getDate()).padStart(2, '0')
-            + String(now.getHours()).padStart(2, '0')
-            + String(now.getMinutes()).padStart(2, '0')
-            + String(now.getSeconds()).padStart(2, '0');
-          const loteId = (row.lote || 'SL').replace(/\s+/g, '');
-          const idDeudor = `DEU-${ts}-${loteId}`;
-
-          const today = now.toISOString().split('T')[0];
-
-          // Preparar registro para Supabase
-          const record = {
-            nombre:                row.propietario,
-            lote:                  row.lote,
-            tipo:                  row.casa_lote,
-            correo:                row.correo,
-            telefono:              row.telefono,
-            habitan:               row.habitan,
-            residente_inquilino:   row.residente_inquilino,
-            meses_atraso:          row.meses_atraso,
-            adeudo_mantenimiento:  row.adeudo_mantenimiento,
-            adeudo_intereses:      row.adeudo_intereses,
-            cuotas_extraordinarias: row.cuotas_extraordinarias,
-            multas:                row.multas,
-            adeudo_total:          row.adeudo_total,
-            motivo_adeudo:         row.motivo_adeudo,
-            nivel_disposicion:     row.nivel_disposicion,
-            probabilidad:          row.probabilidad,
-            id_condominio:         condominioId,
-            fecha_actualizacion:   today
-          };
-
-          try {
-            // ── Verificar si ya existe un registro con mismo lote + condominio ──
-            const { data: existing, error: selectError } = await supabaseClient
+          if (existing) {
+            const { error: updateError } = await supabaseClient
               .from('deudores')
-              .select('id_deudor')
-              .eq('lote', row.lote)
-              .eq('id_condominio', condominioId)
-              .maybeSingle();
-
-            if (selectError) throw selectError;
-
-            if (existing) {
-              // ── UPDATE: el registro ya existe ──
-              const { error: updateError } = await supabaseClient
-                .from('deudores')
-                .update(record)
-                .eq('id_deudor', existing.id_deudor);
-
-              if (updateError) throw updateError;
-              updated++;
-            } else {
-              // ── INSERT: registro nuevo ──
-              record.id_deudor = idDeudor;
-              record.estado_contacto = 'Pendiente';
-              record.fecha_alta = today;
-
-              const { error: insertError } = await supabaseClient
-                .from('deudores')
-                .insert(record);
-
-              if (insertError) throw insertError;
-              inserted++;
-            }
-          } catch (err) {
-            errors++;
-            const msg = `Fila ${i + 1} (${row.propietario || '?'}, Lote ${row.lote || '?'}): ${err.message || err}`;
-            errorMessages.push(msg);
-            // Continuar con las demás filas — nunca detener el proceso
+              .update(record)
+              .eq('id_deudor', existing.id_deudor);
+            if (updateError) throw updateError;
+            updated++;
+          } else {
+            record.id_deudor = idDeudor;
+            record.estado_contacto = 'Pendiente';
+            record.fecha_alta = today;
+            const { error: insertError } = await supabaseClient.from('deudores').insert(record);
+            if (insertError) throw insertError;
+            inserted++;
           }
-
-          // Ceder el hilo para que el navegador actualice la UI
-          if (i % 5 === 0) {
-            await new Promise(r => setTimeout(r, 0));
-          }
+        } catch (err) {
+          errors++;
+          errorMessages.push(`Fila ${i + 1} (${row.propietario || '?'}, Lote ${row.lote || '?'}): ${err.message || err}`);
         }
 
-        // ── Paso 4: Mostrar resultados ────────────────────────
-        progressBarEl.style.width = '100%';
-        progressTextEl.textContent = '¡Proceso completado!';
-
-        countInsertedEl.textContent = inserted;
-        countUpdatedEl.textContent  = updated;
-        countErrorsEl.textContent   = errors;
-        show(resultsEl);
-
-        // Mostrar log de errores si los hubo
-        if (errorMessages.length > 0) {
-          errorLogEl.innerHTML = errorMessages
-            .map(m => `• ${m}`)
-            .join('<br>');
-          show(errorLogEl);
-        }
-
-      } catch (err) {
-        // Error crítico (lectura del archivo, etc.)
-        showError(`Error inesperado: ${err.message || err}`);
-        hide(progressEl);
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
       }
 
-      // Restaurar botón
-      btnProcessEl.disabled = false;
-      btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
-    }
-  </script>
+      progressBarEl.style.width = '100%';
+      progressTextEl.textContent = '¡Proceso completado!';
+      countInsertedEl.textContent = inserted;
+      countUpdatedEl.textContent  = updated;
+      countErrorsEl.textContent   = errors;
+      show(resultsEl);
 
-  <!-- ═══════════════════════════════════════════════════════════
-       INSTRUCCIONES DE DESPLIEGUE — Railway + GitHub
-       ═══════════════════════════════════════════════════════════
-       
-       PASO 1: Crea un repositorio en GitHub y sube este archivo
-               como index.html en la raíz del proyecto.
-       
-       PASO 2: Ve a https://railway.app, inicia sesión con tu
-               cuenta de GitHub y crea un nuevo proyecto:
-               "New Project" → "Deploy from GitHub Repo" →
-               selecciona tu repositorio.
-       
-       PASO 3: Railway detectará que es un sitio estático.
-               Si no lo detecta automáticamente, agrega un
-               Nixpacks config o usa el servicio "Static" con:
-                 - Build command:  (vacío)
-                 - Start command:  npx serve .
-               Railway asignará un dominio público automáticamente.
-       
-       NOTA:   Cada push a la rama main desplegará
-               automáticamente la nueva versión.
-       
-       ALTERNATIVA: Abre este archivo directamente en Chrome
-                    (doble clic) para uso local sin servidor.
-       ═══════════════════════════════════════════════════════════ -->
+      if (errorMessages.length > 0) {
+        errorLogEl.innerHTML = errorMessages.map(m => `• ${m}`).join('<br>');
+        show(errorLogEl);
+      }
+
+      await loadDashboard();
+
+    } catch (err) {
+      showError(`Error inesperado: ${err.message || err}`);
+      hide(progressEl);
+    }
+
+    btnProcessEl.disabled = false;
+    btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
+  }
+
+  checkSession();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     INSTRUCCIONES DE DESPLIEGUE — Railway + GitHub
+     (Ya tienes esto resuelto: solo reemplaza el contenido de
+     index.html en tu repo de GitHub y Railway lo despliega solo.)
+     ═══════════════════════════════════════════════════════════ -->
 </body>
 </html>
