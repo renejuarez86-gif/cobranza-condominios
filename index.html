@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal de Administradores — Sistema de Cobranza</title>
-  <meta name="description" content="Portal para administradores de condominios: ver estado de cuenta y subir el archivo mensual de morosidad.">
+  <meta name="description" content="Portal para administradores de condominios: reportería ejecutiva, confirmación de pagos y carga del archivo mensual de morosidad.">
 
   <!-- ═══════════════════════════════════════════════════════════
        DEPENDENCIAS CDN
@@ -33,9 +33,23 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
     }
     .topbar h1 { font-size: 17px; font-weight: 700; }
     .topbar .sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    #condoSelectorWrap { display: none; align-items: center; gap: 8px; }
+    #condoSelectorWrap label { color: #fff; font-size: 12px; font-weight: 600; margin: 0; }
+    #condoSelector {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.35);
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    #condoSelector option { color: #1e293b; }
     #logoutBtn {
       background: rgba(255,255,255,.12);
       color: #fff;
@@ -48,7 +62,7 @@
     }
     #logoutBtn:hover { background: rgba(255,255,255,.22); }
 
-    .wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; }
 
     /* ── Tarjeta / secciones ─────────────────────────────────── */
     .card {
@@ -66,7 +80,7 @@
     /* ── LOGIN ───────────────────────────────────────────────── */
     #loginScreen { max-width: 380px; margin: 90px auto; }
     label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: #1e293b; }
-    input[type=email], input[type=password], input[type=file] {
+    input[type=email], input[type=password], input[type=file], input[type=number] {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid #dde4ea;
@@ -106,6 +120,34 @@
     .badge.ok { background: #ecfdf5; color: #10b981; }
     .badge.pend { background: #fef3e2; color: #9a6b00; }
     .badge.neutral { background: #eef2f6; color: #064e3b; }
+    .badge.bad { background: #fef2f2; color: #dc2626; }
+
+    /* ── EJECUTIVO / INDICADORES ─────────────────────────────── */
+    .exec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 720px) { .exec-grid { grid-template-columns: 1fr; } }
+    .exec-block h4 { font-size: 13px; color: #475569; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px; }
+    .kpi-big { font-size: 34px; font-weight: 700; color: #064e3b; line-height: 1; }
+    .kpi-sub { font-size: 12px; color: #64748b; margin-top: 6px; }
+
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+    .bar-row .bar-label { width: 90px; flex-shrink: 0; color: #475569; }
+    .bar-row .bar-track { flex: 1; height: 14px; background: #eef2f6; border-radius: 6px; overflow: hidden; }
+    .bar-row .bar-fill { height: 100%; background: #10b981; border-radius: 6px; }
+    .bar-row .bar-fill.warn { background: #f59e0b; }
+    .bar-row .bar-fill.bad { background: #dc2626; }
+    .bar-row .bar-val { width: 90px; text-align: right; flex-shrink: 0; color: #064e3b; font-weight: 600; }
+
+    /* ── PAGOS PENDIENTES ────────────────────────────────────── */
+    .pago-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .pago-row:last-child { border-bottom: none; }
+    .pago-info { flex: 1; min-width: 200px; }
+    .pago-info strong { color: #064e3b; }
+    .pago-monto-input { width: 120px; padding: 6px 8px; border: 1px solid #dde4ea; border-radius: 6px; font-size: 13px; }
+    .btn-mini { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-confirmar { background: #10b981; color: #fff; }
+    .btn-confirmar:hover { background: #059669; }
+    .btn-rechazar { background: #fff; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-rechazar:hover { background: #fef2f2; }
 
     /* ── SUBIR ARCHIVO (misma lógica de siempre) ───────────────── */
     .file-selection-area {
@@ -182,7 +224,13 @@
     <h1>Portal de Administradores</h1>
     <div class="sub">Sistema de Cobranza</div>
   </div>
-  <button id="logoutBtn">Cerrar sesión</button>
+  <div class="topbar-right">
+    <div id="condoSelectorWrap">
+      <label for="condoSelector">Ver:</label>
+      <select id="condoSelector"></select>
+    </div>
+    <button id="logoutBtn">Cerrar sesión</button>
+  </div>
 </div>
 
 <div class="wrap">
@@ -209,6 +257,38 @@
       <div class="stat"><div class="num" id="statFirmado">–</div><div class="label">Convenios firmados</div></div>
     </div>
 
+    <!-- ===== INDICADORES EJECUTIVOS ===== -->
+    <div class="card">
+      <h3>📊 Indicadores ejecutivos</h3>
+      <p class="hint">Vista rápida de qué tan sana está la cobranza de tu(s) condominio(s).</p>
+      <div class="exec-grid">
+        <div class="exec-block">
+          <h4>% de recuperación</h4>
+          <div class="kpi-big" id="kpiRecuperacion">–</div>
+          <div class="kpi-sub" id="kpiRecuperacionSub">Cargando…</div>
+        </div>
+        <div class="exec-block">
+          <h4>Cartera por antigüedad</h4>
+          <div id="antiguedadWrap"><p class="empty">Cargando…</p></div>
+        </div>
+        <div class="exec-block">
+          <h4>Tendencia mensual (últimos 6 meses)</h4>
+          <div class="tablewrap" id="tendenciaWrap"><p class="empty">Cargando…</p></div>
+        </div>
+        <div class="exec-block" id="comparativoBlock" style="display:none;">
+          <h4>Comparativo entre condominios</h4>
+          <div class="tablewrap" id="comparativoWrap"><p class="empty">Cargando…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGOS POR CONFIRMAR ===== -->
+    <div class="card">
+      <h3>💰 Pagos reportados por confirmar</h3>
+      <p class="hint">Cuando un residente avisa por WhatsApp que ya pagó, aparece aquí. Verifica tu estado de cuenta bancario, ajusta el monto si hace falta, y confirma o rechaza.</p>
+      <div id="pagosPendientesWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
     <div class="card">
       <h3>Residentes con saldo pendiente</h3>
       <div class="tablewrap" id="deudoresTableWrap"><p class="empty">Cargando…</p></div>
@@ -221,7 +301,7 @@
 
     <div class="card">
       <h3>📋 Subir archivo mensual de morosidad</h3>
-      <p class="hint">Sube el archivo Excel (.xlsx) de recuperación de cartera de tu condominio. Los residentes se agregarán o actualizarán automáticamente — nunca se tocan los datos de otros condominios.</p>
+      <p class="hint">Sube el archivo Excel (.xlsx) de recuperación de cartera. Los residentes se agregarán o actualizarán automáticamente en el condominio seleccionado arriba — nunca se tocan los datos de otros condominios.</p>
 
       <div class="file-selection-area">
         <label for="fileInput" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
@@ -260,7 +340,7 @@
 
   </div>
 
-  <div class="footer">Sistema interno de administración de condominios · v2.0 — con acceso por administrador</div>
+  <div class="footer">Sistema interno de administración de condominios · v3.0 — reportería ejecutiva y confirmación de pagos</div>
 </div>
 
 <script>
@@ -273,12 +353,17 @@
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  let currentCondoId = null;
+  let condoList = [];        // [{id, nombre}] — todos los condominios de este administrador
+  let currentCondoId = null; // id de un condominio, o 'ALL' para ver todos juntos
   let selectedFile = null;
 
   const $ = (id) => document.getElementById(id);
   function show(el) { el.classList.add('visible'); }
   function hide(el) { el.classList.remove('visible'); }
+
+  function activeCondoIds() {
+    return currentCondoId === 'ALL' ? condoList.map(c => c.id) : [currentCondoId];
+  }
 
   // ── LOGIN ──────────────────────────────────────────────────
   $('loginBtn').addEventListener('click', async () => {
@@ -311,19 +396,23 @@
     const { data: userData } = await supabaseClient.auth.getUser();
     const uid = userData.user.id;
 
-    const { data: adminRow, error: adminErr } = await supabaseClient
-      .from('administradores')
-      .select('id_condominio, nombre')
-      .eq('user_id', uid)
-      .maybeSingle();
+    const { data: links, error: linksErr } = await supabaseClient
+      .from('administrador_condominios')
+      .select('id_condominio, condominios(nombre_condominio)')
+      .eq('user_id', uid);
 
-    if (adminErr || !adminRow) {
+    if (linksErr || !links || !links.length) {
       showLoginError('Tu usuario no está vinculado a ningún condominio todavía. Avisa al equipo técnico.');
       await supabaseClient.auth.signOut();
       return;
     }
 
-    currentCondoId = adminRow.id_condominio;
+    condoList = links.map(l => ({
+      id: l.id_condominio,
+      nombre: (l.condominios && l.condominios.nombre_condominio) || l.id_condominio
+    }));
+
+    setupCondoSelector();
 
     $('loginScreen').style.display = 'none';
     $('app').style.display = 'block';
@@ -332,22 +421,63 @@
     await loadDashboard();
   }
 
+  function setupCondoSelector() {
+    const wrap = $('condoSelectorWrap');
+    const sel = $('condoSelector');
+    sel.innerHTML = '';
+
+    if (condoList.length > 1) {
+      const optAll = document.createElement('option');
+      optAll.value = 'ALL';
+      optAll.textContent = `Todos mis condominios (${condoList.length})`;
+      sel.appendChild(optAll);
+    }
+    condoList.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nombre;
+      sel.appendChild(opt);
+    });
+
+    currentCondoId = condoList.length > 1 ? 'ALL' : condoList[0].id;
+    sel.value = currentCondoId;
+    wrap.style.display = condoList.length > 1 ? 'flex' : 'none';
+
+    sel.onchange = () => { currentCondoId = sel.value; loadDashboard(); };
+
+    $('comparativoBlock').style.display = condoList.length > 1 ? 'block' : 'none';
+  }
+
   // ── DASHBOARD ──────────────────────────────────────────────
   async function loadDashboard() {
+    const ids = activeCondoIds();
+
     const { data: deudores } = await supabaseClient
       .from('deudores')
-      .select('nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto')
-      .eq('id_condominio', currentCondoId);
+      .select('id_deudor, nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto, id_condominio')
+      .in('id_condominio', ids);
 
     const { data: convenios } = await supabaseClient
       .from('convenios')
-      .select('nombre_deudor, unidad, num_mensualidades, monto_mensualidad, monto_total, estado, fecha_actualizacion')
-      .eq('id_condominio', currentCondoId)
+      .select('nombre_deudor, unidad, num_mensualidades, monto_mensualidad, monto_total, estado, fecha_actualizacion, id_condominio')
+      .in('id_condominio', ids)
       .order('fecha_actualizacion', { ascending: false });
 
-    renderStats(deudores || [], convenios || []);
-    renderDeudoresTable(deudores || []);
-    renderConveniosTable(convenios || []);
+    const { data: pagos } = await supabaseClient
+      .from('pagos')
+      .select('id_pago, id_deudor, id_condominio, monto_pagado, fecha_pago, metodo_pago, referencia, estado_pago, fecha_actualizacion')
+      .in('id_condominio', ids)
+      .order('fecha_pago', { ascending: false });
+
+    const D = deudores || [], C = convenios || [], P = pagos || [];
+
+    renderStats(D, C);
+    renderDeudoresTable(D);
+    renderConveniosTable(C);
+    renderPagosPendientes(P, D);
+    renderEjecutivo(D, C, P);
+
+    if (condoList.length > 1) await renderComparativo();
   }
 
   function renderStats(deudores, convenios) {
@@ -361,12 +491,14 @@
     const map = {
       'Convenio_Firmado': 'ok',
       'Pagado': 'ok',
+      'Confirmado': 'ok',
       'Pendiente': 'neutral',
       'En_Negociacion': 'neutral',
       'Convenio_Enviado_Espera_Firma': 'pend',
       'Pago_Reportado': 'pend',
       'En_Proceso_Pago': 'pend',
       'Escalar_Abogado': 'pend',
+      'Rechazado': 'bad',
     };
     const cls = map[estado] || 'neutral';
     return `<span class="badge ${cls}">${estado || '—'}</span>`;
@@ -374,12 +506,14 @@
 
   function renderDeudoresTable(rows) {
     const wrap = $('deudoresTableWrap');
-    if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados en tu condominio.</p>'; return; }
-    let html = '<table><thead><tr><th>Nombre</th><th>Lote</th><th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th></tr></thead><tbody>';
+    if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados.</p>'; return; }
+    const showCondo = currentCondoId === 'ALL';
+    let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th></tr></thead><tbody>`;
     for (const d of rows) {
       html += `<tr>
         <td>${escapeHtml(d.nombre)}</td>
         <td>${escapeHtml(d.lote)}</td>
+        ${showCondo ? `<td>${escapeHtml(d.id_condominio)}</td>` : ''}
         <td>$${Number(d.adeudo_total || 0).toLocaleString()}</td>
         <td>${escapeHtml(d.meses_atraso ?? '—')}</td>
         <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
@@ -393,12 +527,14 @@
 
   function renderConveniosTable(rows) {
     const wrap = $('conveniosTableWrap');
-    if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay convenios registrados en tu condominio.</p>'; return; }
-    let html = '<table><thead><tr><th>Residente</th><th>Unidad</th><th>Mensualidades</th><th>Monto mensual</th><th>Estado</th><th>Última actualización</th></tr></thead><tbody>';
+    if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay convenios registrados.</p>'; return; }
+    const showCondo = currentCondoId === 'ALL';
+    let html = `<table><thead><tr><th>Residente</th><th>Unidad</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Mensualidades</th><th>Monto mensual</th><th>Estado</th><th>Última actualización</th></tr></thead><tbody>`;
     for (const c of rows) {
       html += `<tr>
         <td>${escapeHtml(c.nombre_deudor)}</td>
         <td>${escapeHtml(c.unidad)}</td>
+        ${showCondo ? `<td>${escapeHtml(c.id_condominio)}</td>` : ''}
         <td>${c.num_mensualidades ?? '—'}</td>
         <td>$${Number(c.monto_mensualidad || 0).toLocaleString()}</td>
         <td>${estadoBadge(c.estado)}</td>
@@ -407,6 +543,166 @@
     }
     html += '</tbody></table>';
     wrap.innerHTML = html;
+  }
+
+  // ── PAGOS POR CONFIRMAR ──────────────────────────────────────
+  function renderPagosPendientes(pagos, deudores) {
+    const wrap = $('pagosPendientesWrap');
+    const pendientes = pagos.filter(p => p.estado_pago === 'Pendiente');
+    if (!pendientes.length) { wrap.innerHTML = '<p class="empty">No hay pagos esperando confirmación por ahora.</p>'; return; }
+
+    const deudorPorId = {};
+    deudores.forEach(d => { deudorPorId[d.id_deudor] = d; });
+
+    let html = '';
+    for (const p of pendientes) {
+      const d = deudorPorId[p.id_deudor];
+      const nombre = d ? d.nombre : p.id_deudor;
+      const lote = d ? d.lote : '—';
+      html += `<div class="pago-row">
+        <div class="pago-info">
+          <strong>${escapeHtml(nombre)}</strong> — Lote ${escapeHtml(lote)} (${escapeHtml(p.id_condominio)})<br>
+          <span style="color:#64748b;">Reportó pago el ${p.fecha_pago ? new Date(p.fecha_pago).toLocaleDateString() : '—'} · ${escapeHtml(p.metodo_pago || 'Transferencia')}</span>
+        </div>
+        <input type="number" class="pago-monto-input" id="monto-${escapeHtml(p.id_pago)}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01">
+        <button class="btn-mini btn-confirmar" onclick="confirmarPago('${escapeHtml(p.id_pago)}', '${escapeHtml(p.id_deudor)}')">✅ Confirmar</button>
+        <button class="btn-mini btn-rechazar" onclick="rechazarPago('${escapeHtml(p.id_pago)}')">✖ Rechazar</button>
+      </div>`;
+    }
+    wrap.innerHTML = html;
+  }
+
+  async function confirmarPago(idPago, idDeudor) {
+    const input = $(`monto-${idPago}`);
+    const monto = Number(input ? input.value : 0);
+    if (!monto || monto <= 0) { alert('Ingresa un monto válido antes de confirmar.'); return; }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const { error: errPago } = await supabaseClient
+      .from('pagos')
+      .update({ estado_pago: 'Confirmado', monto_pagado: monto, fecha_actualizacion: today })
+      .eq('id_pago', idPago);
+
+    if (errPago) { alert('No se pudo confirmar el pago: ' + errPago.message); return; }
+
+    const { data: deudorRow } = await supabaseClient
+      .from('deudores')
+      .select('adeudo_total')
+      .eq('id_deudor', idDeudor)
+      .maybeSingle();
+
+    const saldoActual = Number((deudorRow && deudorRow.adeudo_total) || 0);
+    const nuevoSaldo = Math.max(0, saldoActual - monto);
+    const nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : 'En_Negociacion';
+
+    await supabaseClient
+      .from('deudores')
+      .update({ adeudo_total: nuevoSaldo, estado_contacto: nuevoEstado, fecha_actualizacion: today })
+      .eq('id_deudor', idDeudor);
+
+    await loadDashboard();
+  }
+
+  async function rechazarPago(idPago) {
+    if (!confirm('¿Rechazar este pago? El residente seguirá apareciendo con saldo pendiente y podrá volver a reportar su pago.')) return;
+    const today = new Date().toISOString().split('T')[0];
+    await supabaseClient.from('pagos').update({ estado_pago: 'Rechazado', fecha_actualizacion: today }).eq('id_pago', idPago);
+    await loadDashboard();
+  }
+
+  // ── INDICADORES EJECUTIVOS ──────────────────────────────────
+  function renderEjecutivo(deudores, convenios, pagos) {
+    // % de recuperación: confirmado vs. lo que aún está pendiente
+    const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
+    const pendiente = deudores.reduce((s, d) => s + Number(d.adeudo_total || 0), 0);
+    const totalHistorico = recuperado + pendiente;
+    const pctRecuperacion = totalHistorico > 0 ? Math.round((recuperado / totalHistorico) * 100) : 0;
+
+    $('kpiRecuperacion').textContent = totalHistorico > 0 ? `${pctRecuperacion}%` : '—';
+    $('kpiRecuperacionSub').textContent = totalHistorico > 0
+      ? `$${recuperado.toLocaleString()} recuperados de $${totalHistorico.toLocaleString()} en total`
+      : 'Aún no hay datos suficientes.';
+
+    // Cartera por antigüedad (meses_atraso puede venir como texto del Excel)
+    const buckets = { '0-3 meses': 0, '3-6 meses': 0, '6-12 meses': 0, '+12 meses': 0, 'Sin dato': 0 };
+    for (const d of deudores) {
+      const meses = parseInt(d.meses_atraso, 10);
+      const monto = Number(d.adeudo_total || 0);
+      if (isNaN(meses)) buckets['Sin dato'] += monto;
+      else if (meses <= 3) buckets['0-3 meses'] += monto;
+      else if (meses <= 6) buckets['3-6 meses'] += monto;
+      else if (meses <= 12) buckets['6-12 meses'] += monto;
+      else buckets['+12 meses'] += monto;
+    }
+    const maxBucket = Math.max(1, ...Object.values(buckets));
+    let antHtml = '';
+    for (const [label, monto] of Object.entries(buckets)) {
+      if (monto === 0 && label === 'Sin dato') continue;
+      const pct = Math.round((monto / maxBucket) * 100);
+      const cls = label === '+12 meses' ? 'bad' : (label === '6-12 meses' ? 'warn' : '');
+      antHtml += `<div class="bar-row">
+        <div class="bar-label">${label}</div>
+        <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+        <div class="bar-val">$${monto.toLocaleString()}</div>
+      </div>`;
+    }
+    $('antiguedadWrap').innerHTML = antHtml || '<p class="empty">Sin datos de cartera todavía.</p>';
+
+    // Tendencia mensual — últimos 6 meses, según fecha_pago de pagos confirmados
+    const porMes = {};
+    for (const p of pagos) {
+      if (p.estado_pago !== 'Confirmado' || !p.fecha_pago) continue;
+      const mes = String(p.fecha_pago).slice(0, 7); // YYYY-MM
+      porMes[mes] = (porMes[mes] || 0) + Number(p.monto_pagado || 0);
+    }
+    const meses = Object.keys(porMes).sort().slice(-6);
+    let tendHtml = '';
+    if (!meses.length) {
+      tendHtml = '<p class="empty">Todavía no hay pagos confirmados para mostrar una tendencia.</p>';
+    } else {
+      tendHtml = '<table><thead><tr><th>Mes</th><th>Recuperado</th></tr></thead><tbody>';
+      for (const mes of meses) {
+        tendHtml += `<tr><td>${mes}</td><td>$${porMes[mes].toLocaleString()}</td></tr>`;
+      }
+      tendHtml += '</tbody></table>';
+    }
+    $('tendenciaWrap').innerHTML = tendHtml;
+  }
+
+  async function renderComparativo() {
+    const ids = condoList.map(c => c.id);
+    const { data: deudoresAll } = await supabaseClient
+      .from('deudores')
+      .select('id_condominio, adeudo_total')
+      .in('id_condominio', ids);
+    const { data: pagosAll } = await supabaseClient
+      .from('pagos')
+      .select('id_condominio, monto_pagado, estado_pago')
+      .in('id_condominio', ids);
+
+    const porCondo = {};
+    condoList.forEach(c => { porCondo[c.id] = { nombre: c.nombre, cartera: 0, recuperado: 0 }; });
+    (deudoresAll || []).forEach(d => { if (porCondo[d.id_condominio]) porCondo[d.id_condominio].cartera += Number(d.adeudo_total || 0); });
+    (pagosAll || []).forEach(p => {
+      if (p.estado_pago === 'Confirmado' && porCondo[p.id_condominio]) {
+        porCondo[p.id_condominio].recuperado += Number(p.monto_pagado || 0);
+      }
+    });
+
+    let html = '<table><thead><tr><th>Condominio</th><th>Cartera pendiente</th><th>Recuperado</th><th>% recuperación</th></tr></thead><tbody>';
+    Object.values(porCondo).forEach(c => {
+      const total = c.cartera + c.recuperado;
+      const pct = total > 0 ? Math.round((c.recuperado / total) * 100) : 0;
+      html += `<tr>
+        <td>${escapeHtml(c.nombre)}</td>
+        <td>$${c.cartera.toLocaleString()}</td>
+        <td>$${c.recuperado.toLocaleString()}</td>
+        <td>${total > 0 ? pct + '%' : '—'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    $('comparativoWrap').innerHTML = html;
   }
 
   function escapeHtml(s) {
@@ -463,6 +759,12 @@
     if (e.target.files && e.target.files.length > 0) handleFileSelection(e.target.files[0]);
   });
 
+  function uploadTargetCondoId() {
+    // Si el administrador tiene varias, sube al condominio SELECCIONADO en el menú
+    // (nunca a "ALL"). Si solo tiene uno, siempre es ese.
+    return currentCondoId === 'ALL' ? null : currentCondoId;
+  }
+
   function handleFileSelection(file) {
     resetResults();
     hideError();
@@ -472,10 +774,16 @@
       hide(fileInfoEl); hide(btnProcessEl);
       return;
     }
+    const targetCondo = uploadTargetCondoId();
+    if (!targetCondo) {
+      showError('Selecciona primero UN condominio específico arriba (no "Todos") para saber a dónde cargar este archivo.');
+      selectedFile = null;
+      hide(fileInfoEl); hide(btnProcessEl);
+      return;
+    }
     selectedFile = file;
     fileNameEl.textContent = file.name;
-    // El condominio ya NO se adivina del nombre del archivo — siempre es el tuyo, el de tu sesión.
-    fileMetaEl.textContent = `${formatFileSize(file.size)} · Se cargará a tu condominio: ${(currentCondoId || '').toUpperCase()}`;
+    fileMetaEl.textContent = `${formatFileSize(file.size)} · Se cargará a: ${targetCondo.toUpperCase()}`;
     show(fileInfoEl); show(btnProcessEl);
   }
 
@@ -483,6 +791,8 @@
 
   async function processFile() {
     if (!selectedFile) return;
+    const targetCondo = uploadTargetCondoId();
+    if (!targetCondo) { showError('Selecciona un condominio específico arriba antes de cargar.'); return; }
 
     btnProcessEl.disabled = true;
     btnProcessEl.textContent = '⏳ Procesando...';
@@ -573,7 +883,7 @@
         const idDeudor = `DEU-${ts}-${loteId}`;
         const today = now.toISOString().split('T')[0];
 
-        // id_condominio SIEMPRE es el de la sesión del administrador que subió el archivo —
+        // id_condominio SIEMPRE es el condominio seleccionado arriba por el administrador —
         // nunca se toma del nombre del archivo ni de ninguna columna, para que nadie pueda
         // (ni por error) escribir datos en el condominio de otro.
         const record = {
@@ -593,7 +903,7 @@
           motivo_adeudo:         row.motivo_adeudo,
           nivel_disposicion:     row.nivel_disposicion,
           probabilidad:          row.probabilidad,
-          id_condominio:         currentCondoId,
+          id_condominio:         targetCondo,
           fecha_actualizacion:   today
         };
 
@@ -602,7 +912,7 @@
             .from('deudores')
             .select('id_deudor')
             .eq('lote', row.lote)
-            .eq('id_condominio', currentCondoId)
+            .eq('id_condominio', targetCondo)
             .maybeSingle();
 
           if (selectError) throw selectError;
