@@ -26,6 +26,7 @@
        ═══════════════════════════════════════════════════════════ -->
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
   <!-- ═══════════════════════════════════════════════════════════
        ESTILOS — Todo inline para archivo único
@@ -326,6 +327,16 @@
     .bar-row .bar-fill.bad { background: var(--color-danger); }
     .bar-row .bar-val { width: 90px; text-align: right; flex-shrink: 0; color: var(--color-brand); font-weight: 600; }
 
+    .donut-wrap { position: relative; width: 120px; height: 120px; margin: 4px 0 2px; }
+    .donut-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .donut-center .kpi-big { font-size: 22px; }
+
+    .chart-wrap { position: relative; height: 160px; }
+    .chart-wrap-tall { height: 220px; }
+
+    .mini-bar-track { width: 70px; height: 8px; background: var(--color-track); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+    .mini-bar-fill { display: block; height: 100%; background: var(--color-success); border-radius: 4px; }
+
     /* ── PAGOS PENDIENTES ────────────────────────────────────── */
     .pago-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
     .pago-row:last-child { border-bottom: none; }
@@ -454,7 +465,10 @@
       <div class="exec-grid">
         <div class="exec-block">
           <h4>% de recuperación</h4>
-          <div class="kpi-big" id="kpiRecuperacion">–</div>
+          <div class="donut-wrap">
+            <canvas id="chartRecuperacion" width="120" height="120"></canvas>
+            <div class="donut-center"><div class="kpi-big" id="kpiRecuperacion">–</div></div>
+          </div>
           <div class="kpi-sub" id="kpiRecuperacionSub">Cargando…</div>
         </div>
         <div class="exec-block">
@@ -463,13 +477,21 @@
         </div>
         <div class="exec-block">
           <h4>Tendencia mensual (últimos 6 meses)</h4>
-          <div class="tablewrap" id="tendenciaWrap"><p class="empty">Cargando…</p></div>
+          <div class="chart-wrap" id="tendenciaWrap"><canvas id="chartTendencia"></canvas></div>
+          <p class="empty" id="tendenciaEmpty" style="display:none;">Todavía no hay pagos confirmados para mostrar una tendencia.</p>
         </div>
         <div class="exec-block" id="comparativoBlock" style="display:none;">
           <h4>Comparativo entre condominios</h4>
           <div class="tablewrap" id="comparativoWrap"><p class="empty">Cargando…</p></div>
         </div>
       </div>
+    </div>
+
+    <!-- ===== SEGUIMIENTO DE DEUDORES ===== -->
+    <div class="card">
+      <h3>🧭 Seguimiento de deudores por etapa</h3>
+      <p class="hint">De adeudo detectado a pago confirmado — dónde está atorada tu cartera y cuánto dinero representa cada etapa.</p>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="chartEmbudo"></canvas></div>
     </div>
 
     <!-- ===== PAGOS POR CONFIRMAR ===== -->
@@ -546,6 +568,15 @@
   let condoList = [];        // [{id, nombre}] — todos los condominios de este administrador
   let currentCondoId = null; // id de un condominio, o 'ALL' para ver todos juntos
   let selectedFile = null;
+  let lastEjecutivo = null;  // último {deudores, convenios, pagos} — para redibujar las gráficas al cambiar de tema
+  const charts = {};         // instancias de Chart.js activas
+
+  Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
+  Chart.defaults.font.size = 11;
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
 
   const $ = (id) => document.getElementById(id);
   function show(el) { el.classList.add('visible'); }
@@ -566,6 +597,7 @@
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem('theme', next); } catch (e) {}
     syncThemeIcon();
+    if (lastEjecutivo) renderEjecutivo(lastEjecutivo.deudores, lastEjecutivo.convenios, lastEjecutivo.pagos);
   });
   syncThemeIcon();
 
@@ -821,6 +853,8 @@
 
   // ── INDICADORES EJECUTIVOS ──────────────────────────────────
   function renderEjecutivo(deudores, convenios, pagos) {
+    lastEjecutivo = { deudores, convenios, pagos };
+
     // % de recuperación: confirmado vs. lo que aún está pendiente
     const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
     const pendiente = deudores.reduce((s, d) => s + Number(d.adeudo_total || 0), 0);
@@ -831,6 +865,7 @@
     $('kpiRecuperacionSub').textContent = totalHistorico > 0
       ? `$${recuperado.toLocaleString()} recuperados de $${totalHistorico.toLocaleString()} en total`
       : 'Aún no hay datos suficientes.';
+    renderDonutRecuperacion(pctRecuperacion, totalHistorico > 0);
 
     // Cartera por antigüedad (meses_atraso puede venir como texto del Excel)
     const buckets = { '0-3 meses': 0, '3-6 meses': 0, '6-12 meses': 0, '+12 meses': 0, 'Sin dato': 0 };
@@ -865,17 +900,120 @@
       porMes[mes] = (porMes[mes] || 0) + Number(p.monto_pagado || 0);
     }
     const meses = Object.keys(porMes).sort().slice(-6);
-    let tendHtml = '';
-    if (!meses.length) {
-      tendHtml = '<p class="empty">Todavía no hay pagos confirmados para mostrar una tendencia.</p>';
-    } else {
-      tendHtml = '<table><thead><tr><th>Mes</th><th>Recuperado</th></tr></thead><tbody>';
-      for (const mes of meses) {
-        tendHtml += `<tr><td>${mes}</td><td>$${porMes[mes].toLocaleString()}</td></tr>`;
+    renderTendenciaChart(meses, porMes);
+
+    // Seguimiento de deudores por etapa (embudo de cobranza)
+    renderEmbudoChart(computeEmbudo(deudores, convenios));
+  }
+
+  function computeEmbudo(deudores, convenios) {
+    const countDeudor = (estado) => deudores.filter(d => d.estado_contacto === estado).length;
+    const montoDeudor = (estado) => deudores.filter(d => d.estado_contacto === estado).reduce((s, d) => s + Number(d.adeudo_total || 0), 0);
+    const countConvenio = (estado) => convenios.filter(c => c.estado === estado).length;
+    const montoConvenio = (estado) => convenios.filter(c => c.estado === estado)
+      .reduce((s, c) => s + Number(c.monto_total || (c.monto_mensualidad || 0) * (c.num_mensualidades || 0)), 0);
+
+    return [
+      { label: 'Pendiente',           count: countDeudor('Pendiente'),        monto: montoDeudor('Pendiente'),        colorVar: '--color-text-faint' },
+      { label: 'En negociación',      count: countDeudor('En_Negociacion'),   monto: montoDeudor('En_Negociacion'),   colorVar: '--color-info' },
+      { label: 'Escalado a abogado',  count: countDeudor('Escalar_Abogado'),  monto: montoDeudor('Escalar_Abogado'),  colorVar: '--color-danger' },
+      { label: 'Convenio enviado',    count: countConvenio('Convenio_Enviado_Espera_Firma'), monto: montoConvenio('Convenio_Enviado_Espera_Firma'), colorVar: '--color-warning' },
+      { label: 'Convenio firmado',    count: countConvenio('Convenio_Firmado'), monto: montoConvenio('Convenio_Firmado'), colorVar: '--color-success-light' },
+      { label: 'Pagado',              count: countDeudor('Pagado'),           monto: montoDeudor('Pagado'),           colorVar: '--color-success' },
+    ];
+  }
+
+  function renderDonutRecuperacion(pct, hasData) {
+    const canvas = $('chartRecuperacion');
+    const successColor = cssVar('--color-success');
+    const trackColor = cssVar('--color-track');
+    const data = hasData ? [pct, 100 - pct] : [0, 100];
+
+    if (charts.recuperacion) charts.recuperacion.destroy();
+    charts.recuperacion = new Chart(canvas, {
+      type: 'doughnut',
+      data: { datasets: [{ data, backgroundColor: [successColor, trackColor], borderWidth: 0 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '76%',
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        animation: { duration: 500 }
       }
-      tendHtml += '</tbody></table>';
+    });
+  }
+
+  function renderTendenciaChart(meses, porMes) {
+    const canvas = $('chartTendencia');
+    const emptyEl = $('tendenciaEmpty');
+
+    if (!meses.length) {
+      canvas.closest('.chart-wrap').style.display = 'none';
+      emptyEl.style.display = 'block';
+      if (charts.tendencia) { charts.tendencia.destroy(); charts.tendencia = null; }
+      return;
     }
-    $('tendenciaWrap').innerHTML = tendHtml;
+    canvas.closest('.chart-wrap').style.display = 'block';
+    emptyEl.style.display = 'none';
+
+    const values = meses.map(m => porMes[m]);
+    const successColor = cssVar('--color-success');
+    const textColor = cssVar('--color-text-secondary');
+    const gridColor = cssVar('--color-border');
+
+    if (charts.tendencia) charts.tendencia.destroy();
+    charts.tendencia = new Chart(canvas, {
+      type: 'bar',
+      data: { labels: meses, datasets: [{ data: values, backgroundColor: successColor, borderRadius: 6, maxBarThickness: 36 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `$${ctx.parsed.y.toLocaleString()}` } }
+        },
+        scales: {
+          x: { ticks: { color: textColor }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: textColor, callback: (v) => '$' + v.toLocaleString() }, grid: { color: gridColor } }
+        }
+      }
+    });
+  }
+
+  function renderEmbudoChart(stages) {
+    const canvas = $('chartEmbudo');
+    const colors = stages.map(s => cssVar(s.colorVar));
+    const labels = stages.map(s => s.label);
+    const counts = stages.map(s => s.count);
+    const montos = stages.map(s => s.monto);
+    const textColor = cssVar('--color-text-secondary');
+    const gridColor = cssVar('--color-border');
+
+    if (charts.embudo) charts.embudo.destroy();
+    charts.embudo = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 6, maxBarThickness: 28 }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const monto = montos[ctx.dataIndex];
+                return monto > 0 ? `${ctx.parsed.x} residentes · $${monto.toLocaleString()}` : `${ctx.parsed.x} residentes`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0, color: textColor }, grid: { color: gridColor } },
+          y: { ticks: { color: textColor }, grid: { display: false } }
+        }
+      }
+    });
   }
 
   async function renderComparativo() {
@@ -906,7 +1044,7 @@
         <td>${escapeHtml(c.nombre)}</td>
         <td>$${c.cartera.toLocaleString()}</td>
         <td>$${c.recuperado.toLocaleString()}</td>
-        <td>${total > 0 ? pct + '%' : '—'}</td>
+        <td>${total > 0 ? `<span class="mini-bar-track"><span class="mini-bar-fill" style="width:${pct}%"></span></span>${pct}%` : '—'}</td>
       </tr>`;
     });
     html += '</tbody></table>';
