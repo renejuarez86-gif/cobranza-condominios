@@ -429,7 +429,7 @@
     .progress-section.visible { display: block; }
     .progress-text { font-size: .85rem; color: var(--color-text-secondary); margin-bottom: .5rem; min-height: 1.3em; }
     .progress-bar-track { width: 100%; height: 8px; background: var(--color-border); border-radius: 99px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-success), var(--color-success-light)); border-radius: 99px; transition: width .15s ease; }
+    .progress-bar-fill { height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, var(--color-success), var(--color-success-light)); border-radius: 99px; transition: transform .15s ease; }
 
     .results { display: none; margin-top: 1.5rem; padding: 1.25rem; border-radius: 10px; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
     .results.visible { display: block; }
@@ -1238,7 +1238,7 @@
   function hideError() { hide(alertErrorEl); }
   function resetResults() {
     hide(resultsEl); hide(progressEl); hide(errorLogEl); hideError();
-    progressBarEl.style.width = '0%';
+    progressBarEl.style.transform = 'scaleX(0)';
     errorLogEl.innerHTML = '';
   }
 
@@ -1377,7 +1377,7 @@
       for (let i = 0; i < allRows.length; i++) {
         const row = allRows[i];
         const pct = Math.round(((i + 1) / allRows.length) * 100);
-        progressBarEl.style.width = pct + '%';
+        progressBarEl.style.transform = `scaleX(${pct / 100})`;
         progressTextEl.textContent = `Procesando fila ${i + 1} de ${allRows.length}...`;
 
         const now = new Date();
@@ -1448,7 +1448,7 @@
         if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
       }
 
-      progressBarEl.style.width = '100%';
+      progressBarEl.style.transform = 'scaleX(1)';
       progressTextEl.textContent = '¡Proceso completado!';
       countInsertedEl.textContent = inserted;
       countUpdatedEl.textContent  = updated;
