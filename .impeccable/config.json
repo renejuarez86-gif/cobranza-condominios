@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": ".condo-card",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-09-10T15:58:11.498Z",
+        "reason": "colored top-accent card with border-radius is an intentional, common pattern (Stripe/Linear/Notion style); verified in browser that modern rendering curves the border cleanly at the rounded corners, no visual clash"
+      }
+    ]
+  }
+}
