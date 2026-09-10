@@ -293,7 +293,7 @@
 
     /* ── DASHBOARD ───────────────────────────────────────────── */
     #app { display: none; }
-    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 1.75rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 1.75rem; }
     .stat { background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-stat); padding: 16px; transition: background-color .15s ease; }
     .stat .num { font-size: 26px; font-weight: 700; color: var(--color-brand); }
     .stat .label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
@@ -327,15 +327,52 @@
     .bar-row .bar-fill.bad { background: var(--color-danger); }
     .bar-row .bar-val { width: 90px; text-align: right; flex-shrink: 0; color: var(--color-brand); font-weight: 600; }
 
-    .donut-wrap { position: relative; width: 120px; height: 120px; margin: 4px 0 2px; }
-    .donut-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    .donut-center .kpi-big { font-size: 22px; }
+    .gauge-wrap { position: relative; width: 220px; max-width: 100%; height: 118px; margin: 4px 0 0; }
+    .gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 4px; pointer-events: none; }
+    .gauge-center .kpi-big { font-size: 32px; }
 
     .chart-wrap { position: relative; height: 160px; }
     .chart-wrap-tall { height: 220px; }
 
     .mini-bar-track { width: 70px; height: 8px; background: var(--color-track); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
     .mini-bar-fill { display: block; height: 100%; background: var(--color-success); border-radius: 4px; }
+
+    /* ── KPIs con color semántico ────────────────────────────── */
+    .stat.stat-info .num { color: var(--color-info); }
+    .stat.stat-warning .num { color: var(--color-warning); }
+    .stat.stat-danger .num { color: var(--color-danger); }
+    .stat.stat-success .num { color: var(--color-success); }
+
+    /* ── TARJETAS POR CONDOMINIO ──────────────────────────────── */
+    .condo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    .condo-card { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-top: 4px solid var(--color-border); border-radius: 12px; padding: 14px 16px; }
+    .condo-card.tier-good { border-top-color: var(--color-success); }
+    .condo-card.tier-mid { border-top-color: var(--color-warning); }
+    .condo-card.tier-bad { border-top-color: var(--color-danger); }
+    .condo-card h5 { font-size: 13px; color: var(--color-text); margin-bottom: 6px; }
+    .condo-card .condo-pct { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; color: var(--color-text-secondary); }
+    .condo-card.tier-good .condo-pct { color: var(--color-success); }
+    .condo-card.tier-mid .condo-pct { color: var(--color-warning); }
+    .condo-card.tier-bad .condo-pct { color: var(--color-danger); }
+    .condo-card .condo-sub { font-size: 11px; color: var(--color-text-muted); margin-bottom: 8px; }
+    .condo-card ul { list-style: none; font-size: 12px; color: var(--color-text-secondary); }
+    .condo-card ul li { margin-bottom: 3px; padding-left: 13px; position: relative; }
+    .condo-card ul li::before { content: '•'; position: absolute; left: 0; color: var(--color-text-faint); }
+    .condo-card ul li.risk-item { color: var(--color-danger); }
+
+    /* ── MAPA DE CALOR DE ANTIGÜEDAD ──────────────────────────── */
+    .heatmap-cell { text-align: center; font-weight: 600; }
+    .heatmap-cell.b0 { background: var(--color-success-bg); color: var(--color-success); }
+    .heatmap-cell.b1 { background: var(--color-track); color: var(--color-text-secondary); }
+    .heatmap-cell.b2 { background: var(--color-pend-bg); color: var(--color-pend-text); }
+    .heatmap-cell.b3 { background: var(--color-danger-bg); color: var(--color-danger); }
+
+    /* ── ALERTAS Y LOGROS ──────────────────────────────────────── */
+    .two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 720px) { .two-col-grid { grid-template-columns: 1fr; } }
+    .info-list { list-style: none; font-size: 13px; }
+    .info-list li { padding: 7px 0; border-bottom: 1px solid var(--color-border); }
+    .info-list li:last-child { border-bottom: none; }
 
     /* ── PAGOS PENDIENTES ────────────────────────────────────── */
     .pago-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
@@ -453,9 +490,11 @@
 
     <div class="cards" id="statCards">
       <div class="stat"><div class="num" id="statTotal">–</div><div class="label">Residentes con adeudo</div></div>
-      <div class="stat"><div class="num" id="statNegociacion">–</div><div class="label">En negociación</div></div>
-      <div class="stat"><div class="num" id="statEspera">–</div><div class="label">Convenios esperando firma</div></div>
-      <div class="stat"><div class="num" id="statFirmado">–</div><div class="label">Convenios firmados</div></div>
+      <div class="stat stat-info"><div class="num" id="statNegociacion">–</div><div class="label">En negociación</div></div>
+      <div class="stat stat-danger"><div class="num" id="statEscalados">–</div><div class="label">Escalados a abogado</div></div>
+      <div class="stat stat-success"><div class="num" id="statFirmado">–</div><div class="label">Convenios firmados</div></div>
+      <div class="stat" id="statPctRecuperacionCard"><div class="num" id="statPctRecuperacion">–</div><div class="label">% de recuperación</div></div>
+      <div class="stat stat-warning"><div class="num" id="statCarteraTotal">–</div><div class="label">Cartera pendiente total</div></div>
     </div>
 
     <!-- ===== INDICADORES EJECUTIVOS ===== -->
@@ -465,9 +504,9 @@
       <div class="exec-grid">
         <div class="exec-block">
           <h4>% de recuperación</h4>
-          <div class="donut-wrap">
-            <canvas id="chartRecuperacion" width="120" height="120"></canvas>
-            <div class="donut-center"><div class="kpi-big" id="kpiRecuperacion">–</div></div>
+          <div class="gauge-wrap">
+            <canvas id="chartRecuperacion"></canvas>
+            <div class="gauge-center"><div class="kpi-big" id="kpiRecuperacion">–</div></div>
           </div>
           <div class="kpi-sub" id="kpiRecuperacionSub">Cargando…</div>
         </div>
@@ -480,10 +519,6 @@
           <div class="chart-wrap" id="tendenciaWrap"><canvas id="chartTendencia"></canvas></div>
           <p class="empty" id="tendenciaEmpty" style="display:none;">Todavía no hay pagos confirmados para mostrar una tendencia.</p>
         </div>
-        <div class="exec-block" id="comparativoBlock" style="display:none;">
-          <h4>Comparativo entre condominios</h4>
-          <div class="tablewrap" id="comparativoWrap"><p class="empty">Cargando…</p></div>
-        </div>
       </div>
     </div>
 
@@ -492,6 +527,34 @@
       <h3>🧭 Seguimiento de deudores por etapa</h3>
       <p class="hint">De adeudo detectado a pago confirmado — dónde está atorada tu cartera y cuánto dinero representa cada etapa.</p>
       <div class="chart-wrap chart-wrap-tall"><canvas id="chartEmbudo"></canvas></div>
+    </div>
+
+    <!-- ===== RESUMEN POR CONDOMINIO (solo si el admin tiene varios) ===== -->
+    <div class="card" id="condoScorecardsCard" style="display:none;">
+      <h3>🏢 Resumen por condominio</h3>
+      <p class="hint">Cómo va cada condominio por separado — % de recuperación, cartera pendiente y alertas puntuales.</p>
+      <div class="condo-grid" id="condoScorecardsWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+    <!-- ===== MAPA DE CALOR DE ANTIGÜEDAD (solo si el admin tiene varios) ===== -->
+    <div class="card" id="heatmapCard" style="display:none;">
+      <h3>🔥 Mapa de calor de antigüedad por condominio</h3>
+      <p class="hint">Dónde se concentra la cartera vencida de cada condominio, por rango de meses de atraso.</p>
+      <div class="tablewrap" id="heatmapWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+    <!-- ===== ALERTAS Y LOGROS ===== -->
+    <div class="card">
+      <div class="two-col-grid">
+        <div>
+          <h3>⚠️ Acciones pendientes</h3>
+          <div id="accionesWrap"><p class="empty">Cargando…</p></div>
+        </div>
+        <div>
+          <h3>🏆 Logros y buenas señales</h3>
+          <div id="logrosWrap"><p class="empty">Cargando…</p></div>
+        </div>
+      </div>
     </div>
 
     <!-- ===== PAGOS POR CONFIRMAR ===== -->
@@ -576,6 +639,13 @@
 
   function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  // >=66% = buena salud, 33-66% = atención, <33% = crítico
+  function pctTier(pct) {
+    if (pct >= 66) return 'good';
+    if (pct >= 33) return 'mid';
+    return 'bad';
   }
 
   const $ = (id) => document.getElementById(id);
@@ -685,7 +755,8 @@
 
     sel.onchange = () => { currentCondoId = sel.value; loadDashboard(); };
 
-    $('comparativoBlock').style.display = condoList.length > 1 ? 'block' : 'none';
+    $('condoScorecardsCard').style.display = condoList.length > 1 ? 'block' : 'none';
+    $('heatmapCard').style.display = condoList.length > 1 ? 'block' : 'none';
   }
 
   // ── DASHBOARD ──────────────────────────────────────────────
@@ -711,20 +782,36 @@
 
     const D = deudores || [], C = convenios || [], P = pagos || [];
 
-    renderStats(D, C);
+    renderStats(D, C, P);
     renderDeudoresTable(D);
     renderConveniosTable(C);
     renderPagosPendientes(P, D);
     renderEjecutivo(D, C, P);
+    renderAlertasYLogros(D, C, P);
 
-    if (condoList.length > 1) await renderComparativo();
+    if (condoList.length > 1) {
+      const breakdown = await computeCondoBreakdown();
+      renderCondoScorecards(breakdown);
+      renderAntiguedadHeatmap(breakdown);
+    }
   }
 
-  function renderStats(deudores, convenios) {
+  function renderStats(deudores, convenios, pagos) {
     $('statTotal').textContent = deudores.length;
     $('statNegociacion').textContent = deudores.filter(d => d.estado_contacto === 'En_Negociacion').length;
-    $('statEspera').textContent = convenios.filter(c => c.estado === 'Convenio_Enviado_Espera_Firma').length;
+    $('statEscalados').textContent = deudores.filter(d => d.estado_contacto === 'Escalar_Abogado').length;
     $('statFirmado').textContent = convenios.filter(c => c.estado === 'Convenio_Firmado').length;
+
+    const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
+    const pendiente = deudores.reduce((s, d) => s + Number(d.adeudo_total || 0), 0);
+    const total = recuperado + pendiente;
+    const pct = total > 0 ? Math.round((recuperado / total) * 100) : 0;
+
+    $('statPctRecuperacion').textContent = total > 0 ? `${pct}%` : '—';
+    $('statCarteraTotal').textContent = `$${pendiente.toLocaleString()}`;
+
+    const tierToStatClass = { good: 'stat-success', mid: 'stat-warning', bad: 'stat-danger' };
+    $('statPctRecuperacionCard').className = 'stat' + (total > 0 ? ' ' + tierToStatClass[pctTier(pct)] : '');
   }
 
   function estadoBadge(estado) {
@@ -865,7 +952,7 @@
     $('kpiRecuperacionSub').textContent = totalHistorico > 0
       ? `$${recuperado.toLocaleString()} recuperados de $${totalHistorico.toLocaleString()} en total`
       : 'Aún no hay datos suficientes.';
-    renderDonutRecuperacion(pctRecuperacion, totalHistorico > 0);
+    renderGaugeRecuperacion(pctRecuperacion, totalHistorico > 0);
 
     // Cartera por antigüedad (meses_atraso puede venir como texto del Excel)
     const buckets = { '0-3 meses': 0, '3-6 meses': 0, '6-12 meses': 0, '+12 meses': 0, 'Sin dato': 0 };
@@ -923,20 +1010,23 @@
     ];
   }
 
-  function renderDonutRecuperacion(pct, hasData) {
+  function renderGaugeRecuperacion(pct, hasData) {
     const canvas = $('chartRecuperacion');
-    const successColor = cssVar('--color-success');
+    const tierToColorVar = { good: '--color-success', mid: '--color-warning', bad: '--color-danger' };
+    const fillColor = cssVar(tierToColorVar[pctTier(pct)]);
     const trackColor = cssVar('--color-track');
     const data = hasData ? [pct, 100 - pct] : [0, 100];
 
     if (charts.recuperacion) charts.recuperacion.destroy();
     charts.recuperacion = new Chart(canvas, {
       type: 'doughnut',
-      data: { datasets: [{ data, backgroundColor: [successColor, trackColor], borderWidth: 0 }] },
+      data: { datasets: [{ data, backgroundColor: [fillColor, trackColor], borderWidth: 0 }] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '76%',
+        rotation: -90,
+        circumference: 180,
+        cutout: '75%',
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
         animation: { duration: 500 }
       }
@@ -1016,39 +1106,111 @@
     });
   }
 
-  async function renderComparativo() {
+  // ── RESUMEN Y MAPA DE CALOR POR CONDOMINIO (solo con varios condominios) ──
+  async function computeCondoBreakdown() {
     const ids = condoList.map(c => c.id);
     const { data: deudoresAll } = await supabaseClient
       .from('deudores')
-      .select('id_condominio, adeudo_total')
+      .select('id_condominio, adeudo_total, meses_atraso, estado_contacto')
+      .in('id_condominio', ids);
+    const { data: conveniosAll } = await supabaseClient
+      .from('convenios')
+      .select('id_condominio, estado')
       .in('id_condominio', ids);
     const { data: pagosAll } = await supabaseClient
       .from('pagos')
       .select('id_condominio, monto_pagado, estado_pago')
       .in('id_condominio', ids);
 
-    const porCondo = {};
-    condoList.forEach(c => { porCondo[c.id] = { nombre: c.nombre, cartera: 0, recuperado: 0 }; });
-    (deudoresAll || []).forEach(d => { if (porCondo[d.id_condominio]) porCondo[d.id_condominio].cartera += Number(d.adeudo_total || 0); });
-    (pagosAll || []).forEach(p => {
-      if (p.estado_pago === 'Confirmado' && porCondo[p.id_condominio]) {
-        porCondo[p.id_condominio].recuperado += Number(p.monto_pagado || 0);
-      }
-    });
+    const D = deudoresAll || [], C = conveniosAll || [], P = pagosAll || [];
 
-    let html = '<table><thead><tr><th>Condominio</th><th>Cartera pendiente</th><th>Recuperado</th><th>% recuperación</th></tr></thead><tbody>';
-    Object.values(porCondo).forEach(c => {
-      const total = c.cartera + c.recuperado;
-      const pct = total > 0 ? Math.round((c.recuperado / total) * 100) : 0;
+    return condoList.map(condo => {
+      const d = D.filter(x => x.id_condominio === condo.id);
+      const c = C.filter(x => x.id_condominio === condo.id);
+      const p = P.filter(x => x.id_condominio === condo.id);
+
+      const cartera = d.reduce((s, x) => s + Number(x.adeudo_total || 0), 0);
+      const recuperado = p.filter(x => x.estado_pago === 'Confirmado').reduce((s, x) => s + Number(x.monto_pagado || 0), 0);
+      const total = cartera + recuperado;
+      const pct = total > 0 ? Math.round((recuperado / total) * 100) : 0;
+      const conveniosFirmados = c.filter(x => x.estado === 'Convenio_Firmado').length;
+      const escalados = d.filter(x => x.estado_contacto === 'Escalar_Abogado').length;
+
+      const buckets = { b0: 0, b1: 0, b2: 0, b3: 0 };
+      d.forEach(x => {
+        const meses = parseInt(x.meses_atraso, 10);
+        if (isNaN(meses)) return;
+        const monto = Number(x.adeudo_total || 0);
+        if (meses <= 3) buckets.b0 += monto;
+        else if (meses <= 6) buckets.b1 += monto;
+        else if (meses <= 12) buckets.b2 += monto;
+        else buckets.b3 += monto;
+      });
+
+      return { id: condo.id, nombre: condo.nombre, residentes: d.length, cartera, recuperado, pct, conveniosFirmados, escalados, buckets };
+    });
+  }
+
+  function renderCondoScorecards(breakdown) {
+    const tierToClass = { good: 'tier-good', mid: 'tier-mid', bad: 'tier-bad' };
+    let html = '';
+    breakdown.forEach(c => {
+      const hasData = c.cartera + c.recuperado > 0;
+      const tier = hasData ? tierToClass[pctTier(c.pct)] : '';
+      const items = [`<li>${c.residentes} residente(s) con historial de adeudo</li>`];
+      if (c.conveniosFirmados > 0) items.push(`<li>${c.conveniosFirmados} convenio(s) firmado(s)</li>`);
+      if (c.escalados > 0) items.push(`<li class="risk-item">⚠ ${c.escalados} escalado(s) a abogado</li>`);
+      html += `<div class="condo-card ${tier}">
+        <h5>${escapeHtml(c.nombre)}</h5>
+        <div class="condo-pct">${hasData ? c.pct + '%' : '—'}</div>
+        <div class="condo-sub">$${c.cartera.toLocaleString()} pendiente · $${c.recuperado.toLocaleString()} recuperado</div>
+        <ul>${items.join('')}</ul>
+      </div>`;
+    });
+    $('condoScorecardsWrap').innerHTML = html || '<p class="empty">Sin datos todavía.</p>';
+  }
+
+  function renderAntiguedadHeatmap(breakdown) {
+    let html = '<table><thead><tr><th>Condominio</th><th>0-3 meses</th><th>3-6 meses</th><th>6-12 meses</th><th>+12 meses</th><th>Total</th></tr></thead><tbody>';
+    breakdown.forEach(c => {
+      const totalCartera = c.buckets.b0 + c.buckets.b1 + c.buckets.b2 + c.buckets.b3;
       html += `<tr>
         <td>${escapeHtml(c.nombre)}</td>
-        <td>$${c.cartera.toLocaleString()}</td>
-        <td>$${c.recuperado.toLocaleString()}</td>
-        <td>${total > 0 ? `<span class="mini-bar-track"><span class="mini-bar-fill" style="width:${pct}%"></span></span>${pct}%` : '—'}</td>
+        <td class="heatmap-cell b0">$${c.buckets.b0.toLocaleString()}</td>
+        <td class="heatmap-cell b1">$${c.buckets.b1.toLocaleString()}</td>
+        <td class="heatmap-cell b2">$${c.buckets.b2.toLocaleString()}</td>
+        <td class="heatmap-cell b3">$${c.buckets.b3.toLocaleString()}</td>
+        <td><strong>$${totalCartera.toLocaleString()}</strong></td>
       </tr>`;
     });
     html += '</tbody></table>';
-    $('comparativoWrap').innerHTML = html;
+    $('heatmapWrap').innerHTML = html;
+  }
+
+  // ── ALERTAS Y LOGROS AUTOMÁTICOS ─────────────────────────────
+  function renderAlertasYLogros(deudores, convenios, pagos) {
+    const pendientesPago = pagos.filter(p => p.estado_pago === 'Pendiente').length;
+    const conveniosEnviados = convenios.filter(c => c.estado === 'Convenio_Enviado_Espera_Firma').length;
+    const escalados = deudores.filter(d => d.estado_contacto === 'Escalar_Abogado').length;
+    const rechazados = pagos.filter(p => p.estado_pago === 'Rechazado').length;
+
+    const acciones = [];
+    if (pendientesPago > 0) acciones.push(`💰 ${pendientesPago} pago(s) reportado(s) esperando tu confirmación`);
+    if (conveniosEnviados > 0) acciones.push(`📄 ${conveniosEnviados} convenio(s) enviados esperando firma del residente`);
+    if (escalados > 0) acciones.push(`⚖️ ${escalados} residente(s) escalados a abogado — dales seguimiento legal`);
+    if (!acciones.length) acciones.push('🎉 Sin pendientes urgentes por ahora.');
+
+    const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
+    const conveniosFirmados = convenios.filter(c => c.estado === 'Convenio_Firmado').length;
+    const pagados = deudores.filter(d => d.estado_contacto === 'Pagado').length;
+
+    const logros = [`💵 $${recuperado.toLocaleString()} recuperados en total`];
+    if (conveniosFirmados > 0) logros.push(`✍️ ${conveniosFirmados} convenio(s) de pago firmado(s)`);
+    if (pagados > 0) logros.push(`✅ ${pagados} residente(s) ya liquidaron su adeudo`);
+    logros.push(rechazados === 0 ? '👍 0 pagos rechazados — buena tasa de confirmación' : `⚠ ${rechazados} pago(s) rechazado(s) este periodo`);
+
+    $('accionesWrap').innerHTML = `<ul class="info-list">${acciones.map(a => `<li>${a}</li>`).join('')}</ul>`;
+    $('logrosWrap').innerHTML = `<ul class="info-list">${logros.map(l => `<li>${l}</li>`).join('')}</ul>`;
   }
 
   function escapeHtml(s) {
