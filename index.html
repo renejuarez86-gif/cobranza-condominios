@@ -615,6 +615,32 @@
 
   </div>
 
+  <!-- ===================== PANEL DE DIRECCIÓN (Súper Administrador) ===================== -->
+  <!-- Vista ejecutiva multi-administración — para los dueños de la solución (no gestionan
+       condominios ni deudores puntuales, solo ven el panorama del negocio). Se muestra en vez
+       de #app cuando el usuario logueado existe en la tabla super_administradores. -->
+  <div id="appDireccion" style="display:none;">
+
+    <div class="cards" id="statCardsDireccion">
+      <div class="stat"><div class="num" id="kpiTotalAdministraciones">–</div><div class="label">Administraciones contratadas</div></div>
+      <div class="stat"><div class="num" id="kpiTotalCondominios">–</div><div class="label">Condominios contratados</div></div>
+      <div class="stat stat-success"><div class="num" id="kpiTotalRecuperado">–</div><div class="label">Recuperado (todas las administraciones)</div></div>
+    </div>
+
+    <div class="card">
+      <h3>💼 Recuperación por Administración</h3>
+      <p class="hint">Cuánto ha recuperado cada Administración hasta ahora, para comparar de un vistazo el desempeño entre clientes.</p>
+      <div class="chart-wrap chart-wrap-tall"><canvas id="chartRecuperacionAdmin"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h3>📐 Reconciliación: morosos cargados vs. unidades contratadas</h3>
+      <p class="hint">Compara cuántos deudores tiene cargado cada condominio contra las unidades que contrató — para detectar un archivo mal cargado antes de que cause un problema. No es un error si hay menos morosos cargados que unidades (no todas están siempre en mora); sí se alerta si hay más (dato imposible).</p>
+      <div class="tablewrap" id="reconUnidadesWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+  </div>
+
   <div class="footer">Sistema interno de administración de condominios · v3.0 — reportería ejecutiva y confirmación de pagos</div>
 </div>
 
@@ -631,7 +657,9 @@
   let condoList = [];        // [{id, nombre}] — todos los condominios de este administrador
   let currentCondoId = null; // id de un condominio, o 'ALL' para ver todos juntos
   let selectedFile = null;
+  let esSuperAdministrador = false; // true = usuario del Panel de Dirección (ver tabla super_administradores)
   let lastEjecutivo = null;  // último {deudores, convenios, pagos} — para redibujar las gráficas al cambiar de tema
+  let lastDireccion = null;  // último {administraciones, condominios, deudores, pagos} — ídem, para el Panel de Dirección
   const charts = {};         // instancias de Chart.js activas
 
   Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
@@ -668,6 +696,7 @@
     try { localStorage.setItem('theme', next); } catch (e) {}
     syncThemeIcon();
     if (lastEjecutivo) renderEjecutivo(lastEjecutivo.deudores, lastEjecutivo.convenios, lastEjecutivo.pagos);
+    if (lastDireccion) renderDireccion(lastDireccion.administraciones, lastDireccion.condominios, lastDireccion.deudores, lastDireccion.pagos);
   });
   syncThemeIcon();
 
@@ -705,6 +734,26 @@
   async function afterLogin() {
     const { data: userData } = await supabaseClient.auth.getUser();
     const uid = userData.user.id;
+
+    // Primero: ¿es un usuario del Panel de Dirección (dueños de la solución)?
+    // Estos usuarios no gestionan condominios puntuales, así que no dependen de
+    // administrador_condominios — se resuelven aparte y ven una vista distinta.
+    const { data: superAdminRow } = await supabaseClient
+      .from('super_administradores')
+      .select('user_id')
+      .eq('user_id', uid)
+      .maybeSingle();
+
+    if (superAdminRow) {
+      esSuperAdministrador = true;
+      $('loginScreen').style.display = 'none';
+      $('app').style.display = 'none';
+      $('appDireccion').style.display = 'block';
+      $('condoSelectorWrap').style.display = 'none';
+      $('logoutBtn').style.display = 'inline-block';
+      await loadDashboardDireccion();
+      return;
+    }
 
     const { data: links, error: linksErr } = await supabaseClient
       .from('administrador_condominios')
@@ -1216,6 +1265,135 @@
   function escapeHtml(s) {
     if (s === null || s === undefined) return '';
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ── PANEL DE DIRECCIÓN (Súper Administrador) ────────────────
+  // Vista de negocio multi-administración: cuántas Administraciones y
+  // condominios están contratados, recuperación por Administración, y la
+  // reconciliación de morosos cargados vs. unidades contratadas. Requiere
+  // que existan las tablas `administraciones` y `super_administradores`,
+  // y la columna `condominios.id_administracion` / `unidades_contratadas`
+  // (ver migration_super_administrador.sql).
+  async function loadDashboardDireccion() {
+    const { data: administraciones } = await supabaseClient
+      .from('administraciones')
+      .select('id_administracion, nombre_administracion');
+
+    const { data: condominios } = await supabaseClient
+      .from('condominios')
+      .select('id_condominio, nombre_condominio, id_administracion, unidades_contratadas');
+
+    const A = administraciones || [];
+    const C = condominios || [];
+    const ids = C.map(c => c.id_condominio);
+
+    let D = [], P = [];
+    if (ids.length) {
+      const { data: deudoresAll } = await supabaseClient
+        .from('deudores').select('id_condominio').in('id_condominio', ids);
+      const { data: pagosAll } = await supabaseClient
+        .from('pagos').select('id_condominio, monto_pagado, estado_pago').in('id_condominio', ids);
+      D = deudoresAll || [];
+      P = pagosAll || [];
+    }
+
+    lastDireccion = { administraciones: A, condominios: C, deudores: D, pagos: P };
+    renderDireccion(A, C, D, P);
+  }
+
+  function renderDireccion(administraciones, condominios, deudores, pagos) {
+    const recuperadoTotal = pagos.filter(p => p.estado_pago === 'Confirmado')
+      .reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
+    $('kpiTotalAdministraciones').textContent = administraciones.length;
+    $('kpiTotalCondominios').textContent = condominios.length;
+    $('kpiTotalRecuperado').textContent = `$${recuperadoTotal.toLocaleString()}`;
+
+    renderRecuperacionPorAdministracionChart(administraciones, condominios, pagos);
+    renderReconciliacionUnidades(administraciones, condominios, deudores);
+  }
+
+  function renderRecuperacionPorAdministracionChart(administraciones, condominios, pagos) {
+    const condoToAdmin = {};
+    condominios.forEach(c => { condoToAdmin[c.id_condominio] = c.id_administracion; });
+
+    const recuperadoPorAdmin = {};
+    administraciones.forEach(a => { recuperadoPorAdmin[a.id_administracion] = 0; });
+    pagos.filter(p => p.estado_pago === 'Confirmado').forEach(p => {
+      const idAdmin = condoToAdmin[p.id_condominio];
+      if (idAdmin == null || !(idAdmin in recuperadoPorAdmin)) return;
+      recuperadoPorAdmin[idAdmin] += Number(p.monto_pagado || 0);
+    });
+
+    const labels = administraciones.map(a => a.nombre_administracion);
+    const values = administraciones.map(a => recuperadoPorAdmin[a.id_administracion] || 0);
+
+    const canvas = $('chartRecuperacionAdmin');
+    const brandColor = cssVar('--color-brand');
+    const textColor = cssVar('--color-text-secondary');
+    const gridColor = cssVar('--color-border');
+
+    if (charts.recuperacionAdmin) charts.recuperacionAdmin.destroy();
+    charts.recuperacionAdmin = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: values, backgroundColor: brandColor, borderRadius: 6, maxBarThickness: 48 }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `$${ctx.parsed.x.toLocaleString()}` } }
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: textColor, callback: (v) => '$' + v.toLocaleString() }, grid: { color: gridColor } },
+          y: { ticks: { color: textColor }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  function renderReconciliacionUnidades(administraciones, condominios, deudores) {
+    const nombrePorAdmin = {};
+    administraciones.forEach(a => { nombrePorAdmin[a.id_administracion] = a.nombre_administracion; });
+
+    const conteoPorCondo = {};
+    deudores.forEach(d => { conteoPorCondo[d.id_condominio] = (conteoPorCondo[d.id_condominio] || 0) + 1; });
+
+    const filas = condominios.map(c => {
+      const cargados = conteoPorCondo[c.id_condominio] || 0;
+      const contratadas = c.unidades_contratadas; // null hasta que Rene lo llene a mano
+      const pct = (contratadas && contratadas > 0) ? Math.round((cargados / contratadas) * 100) : null;
+      const excede = contratadas != null && cargados > contratadas; // dato imposible → alertar
+      return {
+        nombre: c.nombre_condominio || c.id_condominio,
+        administracion: nombrePorAdmin[c.id_administracion] || '—',
+        contratadas, cargados, pct, excede,
+      };
+    });
+
+    let html = '<table><thead><tr>' +
+      '<th>Condominio</th><th>Administración</th><th>Unidades contratadas</th>' +
+      '<th>Morosos cargados</th><th>%</th><th>Estado</th>' +
+      '</tr></thead><tbody>';
+
+    filas.forEach(f => {
+      const contratadasTxt = (f.contratadas == null) ? '<span class="empty">sin definir</span>' : f.contratadas;
+      const pctTxt = (f.pct == null) ? '—' : `${f.pct}%`;
+      const estadoTxt = f.excede
+        ? '<span class="heatmap-cell b3">⚠ Morosos superan lo contratado</span>'
+        : (f.contratadas == null ? '—' : '✓ Dentro de lo esperado');
+      html += `<tr>
+        <td>${escapeHtml(f.nombre)}</td>
+        <td>${escapeHtml(f.administracion)}</td>
+        <td>${contratadasTxt}</td>
+        <td>${f.cargados}</td>
+        <td>${pctTxt}</td>
+        <td>${estadoTxt}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    $('reconUnidadesWrap').innerHTML = html || '<p class="empty">Sin condominios todavía.</p>';
   }
 
   // ── SELECCIÓN DE ARCHIVO (misma lógica de siempre) ──────────
