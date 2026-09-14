@@ -639,6 +639,45 @@
       <div class="tablewrap" id="reconUnidadesWrap"><p class="empty">Cargando…</p></div>
     </div>
 
+    <div class="card">
+      <h3>🏦 Cargar datos bancarios y reglas de negociación por condominio</h3>
+      <p class="hint">Sube la plantilla de Excel (pestaña "Datos del Condominio") para dar de alta un condominio nuevo o actualizar su cuenta bancaria, enganche y condonación. Puede traer una fila o varias — cada fila crea o actualiza un condominio, según su ID_Condominio. No hace falta seleccionar un condominio arriba: cada fila trae el suyo.</p>
+
+      <div class="file-selection-area">
+        <label for="fileInputCondo" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
+        <span class="file-hint">Formato aceptado: .xlsx</span>
+        <input type="file" id="fileInputCondo" accept=".xlsx">
+      </div>
+
+      <div class="file-info" id="fileInfoCondo">
+        <span class="file-info-icon">📊</span>
+        <div class="file-info-details">
+          <div class="file-info-name" id="fileNameCondo">—</div>
+          <div class="file-info-meta" id="fileMetaCondo">—</div>
+        </div>
+      </div>
+
+      <button class="btn-process" id="btnProcessCondo">🚀 Procesar y cargar a Supabase</button>
+
+      <div class="alert alert-error" id="alertErrorCondo"></div>
+
+      <div class="progress-section" id="progressSectionCondo">
+        <div class="progress-text" id="progressTextCondo">Preparando...</div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarCondo"></div></div>
+      </div>
+
+      <div class="results" id="resultsCondo">
+        <h3>✅ Proceso completado</h3>
+        <div class="results-grid">
+          <div class="result-item inserted"><span class="result-number" id="countCreatedCondo">0</span><span class="result-label">Condominios nuevos</span></div>
+          <div class="result-item updated"><span class="result-number" id="countUpdatedCondo">0</span><span class="result-label">Actualizados</span></div>
+          <div class="result-item errors"><span class="result-number" id="countErrorsCondo">0</span><span class="result-label">Errores</span></div>
+        </div>
+      </div>
+
+      <div class="error-log" id="errorLogCondo"></div>
+    </div>
+
   </div>
 
   <div class="footer">Sistema interno de administración de condominios · v3.0 — reportería ejecutiva y confirmación de pagos</div>
@@ -1394,6 +1433,268 @@
 
     html += '</tbody></table>';
     $('reconUnidadesWrap').innerHTML = html || '<p class="empty">Sin condominios todavía.</p>';
+  }
+
+  // ── CARGADOR: Datos del Condominio (banco + negociación) ────────
+  // Solo lo usan los super_administradores (Panel de Dirección). A
+  // diferencia del cargador de deudores, no depende de un condominio
+  // seleccionado arriba: cada fila de la hoja trae su propio
+  // ID_Condominio, así que puede dar de alta o actualizar varios
+  // condominios de un solo archivo. Sube TODA la fila cada vez — si
+  // un campo viene vacío en el Excel, se guarda vacío (no es un
+  // parche parcial), igual que ya hace el cargador de deudores.
+  //
+  // OJO con los porcentajes: en Supabase/Make estos campos se leen
+  // como número entero de porcentaje (ej. 20 = "20%", se concatena
+  // directo con "%" en los mensajes de Lexia — ver v33 del escenario
+  // 2B+M4). La celda de Excel tiene formato "0%", así que SheetJS la
+  // entrega como fracción (0.2) — hay que multiplicar por 100 antes
+  // de guardar.
+  const CONDO_HEADERS = {
+    'id_condominio': 'idCondominio',
+    'nombre_condominio': 'nombreCondominio',
+    'entidad_firma': 'entidadFirma',
+    'banco': 'banco',
+    'clabe_cuenta': 'clabeCuenta',
+    'administrador': 'administrador',
+    'permite_enganche': 'permiteEnganche',
+    'enganche_pct_3m': 'enganchePct3m',
+    'enganche_pct_6m': 'enganchePct6m',
+    'enganche_pct_12m': 'enganchePct12m',
+    'permite_condonacion': 'permiteCondonacion',
+    'condonacion_pct_pago_unico': 'condonacionPctPagoUnico',
+    'condonacion_pct_plazos': 'condonacionPctPlazos',
+    'mensualidades_permitidas': 'mensualidadesPermitidas',
+    'opciones_convenio_habilitadas': 'opcionesConvenioHabilitadas',
+  };
+
+  function cleanBool(val) {
+    if (val === null || val === undefined) return false;
+    const s = String(val).trim().toLowerCase();
+    return s === 'sí' || s === 'si' || s === 'true' || s === 'x';
+  }
+
+  // Un valor con formato "0%" en Excel llega como fracción (0.2). Si ya
+  // viene como número entero (20), lo dejamos igual.
+  function pctToWhole(val) {
+    const n = cleanNumeric(val);
+    if (n === null) return 0;
+    return n > 0 && n <= 1 ? Math.round(n * 100 * 100) / 100 : n;
+  }
+
+  // Busca, entre todas las hojas del archivo, la primera con una columna
+  // "ID_Condominio" en sus primeras 20 filas (detección por nombre de
+  // encabezado, no por posición — para tolerar que alguien reordene columnas).
+  function parseCondominiosSheet(workbook) {
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+
+      let headerIndex = -1, colMap = {};
+      for (let r = 0; r < Math.min(rawRows.length, 20); r++) {
+        const row = rawRows[r];
+        if (!row) continue;
+        const map = {};
+        row.forEach((cell, i) => {
+          if (typeof cell === 'string') {
+            const key = cell.trim().toLowerCase();
+            if (key in CONDO_HEADERS) map[CONDO_HEADERS[key]] = i;
+          }
+        });
+        if ('idCondominio' in map) { headerIndex = r; colMap = map; break; }
+      }
+      if (headerIndex === -1) continue;
+
+      const dataRows = rawRows.slice(headerIndex + 1);
+      const out = [];
+      for (const row of dataRows) {
+        const idCondominio = cleanText(row[colMap.idCondominio]);
+        if (!idCondominio) continue;
+        out.push({
+          id_condominio: idCondominio,
+          nombre_condominio: cleanText(row[colMap.nombreCondominio]),
+          entidad_firma: cleanText(row[colMap.entidadFirma]) || 'Zires Abogados',
+          banco_condominio: cleanText(row[colMap.banco]),
+          clabe_cuenta_condominio: cleanText(row[colMap.clabeCuenta]),
+          administrador: cleanText(row[colMap.administrador]),
+          permite_enganche: cleanBool(row[colMap.permiteEnganche]),
+          enganche_pct_3m: pctToWhole(row[colMap.enganchePct3m]),
+          enganche_pct_6m: pctToWhole(row[colMap.enganchePct6m]),
+          enganche_pct_12m: pctToWhole(row[colMap.enganchePct12m]),
+          permite_condonacion: cleanBool(row[colMap.permiteCondonacion]),
+          condonacion_pct_pago_unico: pctToWhole(row[colMap.condonacionPctPagoUnico]),
+          condonacion_pct_plazos: pctToWhole(row[colMap.condonacionPctPlazos]),
+          mensualidades_permitidas: cleanText(row[colMap.mensualidadesPermitidas]),
+          opciones_convenio_habilitadas: cleanText(row[colMap.opcionesConvenioHabilitadas]),
+        });
+      }
+      if (out.length) return out; // primera hoja que trae ID_Condominio, con datos
+    }
+    return [];
+  }
+
+  const fileInputCondoEl    = $('fileInputCondo');
+  const fileInfoCondoEl     = $('fileInfoCondo');
+  const fileNameCondoEl     = $('fileNameCondo');
+  const fileMetaCondoEl     = $('fileMetaCondo');
+  const btnProcessCondoEl   = $('btnProcessCondo');
+  const alertErrorCondoEl   = $('alertErrorCondo');
+  const progressCondoEl     = $('progressSectionCondo');
+  const progressTextCondoEl = $('progressTextCondo');
+  const progressBarCondoEl  = $('progressBarCondo');
+  const resultsCondoEl      = $('resultsCondo');
+  const countCreatedCondoEl = $('countCreatedCondo');
+  const countUpdatedCondoEl = $('countUpdatedCondo');
+  const countErrorsCondoEl  = $('countErrorsCondo');
+  const errorLogCondoEl     = $('errorLogCondo');
+  let selectedFileCondo = null;
+
+  function showErrorCondo(msg) { alertErrorCondoEl.textContent = msg; show(alertErrorCondoEl); }
+  function hideErrorCondo() { hide(alertErrorCondoEl); }
+  function resetResultsCondo() {
+    hide(resultsCondoEl); hide(progressCondoEl); hide(errorLogCondoEl); hideErrorCondo();
+    progressBarCondoEl.style.transform = 'scaleX(0)';
+    errorLogCondoEl.innerHTML = '';
+  }
+
+  if (fileInputCondoEl) {
+    fileInputCondoEl.addEventListener('click', function(e) { e.target.value = ''; });
+    fileInputCondoEl.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) handleFileSelectionCondo(e.target.files[0]);
+    });
+  }
+
+  function handleFileSelectionCondo(file) {
+    resetResultsCondo();
+    hideErrorCondo();
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      showErrorCondo('Solo se aceptan archivos .xlsx');
+      selectedFileCondo = null;
+      hide(fileInfoCondoEl); hide(btnProcessCondoEl);
+      return;
+    }
+    selectedFileCondo = file;
+    fileNameCondoEl.textContent = file.name;
+    fileMetaCondoEl.textContent = formatFileSize(file.size);
+    show(fileInfoCondoEl); show(btnProcessCondoEl);
+  }
+
+  if (btnProcessCondoEl) btnProcessCondoEl.addEventListener('click', () => processFileCondominios());
+
+  async function processFileCondominios() {
+    if (!selectedFileCondo) return;
+    btnProcessCondoEl.disabled = true;
+    btnProcessCondoEl.textContent = '⏳ Procesando...';
+    resetResultsCondo();
+    show(progressCondoEl);
+    progressTextCondoEl.textContent = 'Leyendo archivo Excel...';
+
+    try {
+      const data = await selectedFileCondo.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const rows = parseCondominiosSheet(workbook);
+
+      if (rows.length === 0) {
+        showErrorCondo('No se encontró la hoja "Datos del Condominio" (o no tiene la columna ID_Condominio). Verifica que el formato sea correcto.');
+        btnProcessCondoEl.disabled = false;
+        btnProcessCondoEl.textContent = '🚀 Procesar y cargar a Supabase';
+        hide(progressCondoEl);
+        return;
+      }
+
+      progressTextCondoEl.textContent = `Se encontraron ${rows.length} fila(s). Iniciando carga...`;
+
+      let created = 0, updated = 0, errors = 0;
+      const errorMessages = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const pct = Math.round(((i + 1) / rows.length) * 100);
+        progressBarCondoEl.style.transform = `scaleX(${pct / 100})`;
+        progressTextCondoEl.textContent = `Procesando fila ${i + 1} de ${rows.length} (${row.id_condominio})...`;
+
+        try {
+          // 1) Administración: si trae un Administrador, asegurar que exista en
+          //    `administraciones` (mismo criterio que el backfill original: el
+          //    texto del administrador es también su id_administracion).
+          if (row.administrador) {
+            const { data: existingAdmin, error: adminSelErr } = await supabaseClient
+              .from('administraciones').select('id_administracion')
+              .eq('id_administracion', row.administrador).maybeSingle();
+            if (adminSelErr) throw adminSelErr;
+            if (!existingAdmin) {
+              const { error: adminInsErr } = await supabaseClient
+                .from('administraciones')
+                .insert({ id_administracion: row.administrador, nombre_administracion: row.administrador });
+              if (adminInsErr) throw adminInsErr;
+            }
+          }
+
+          const record = {
+            nombre_condominio: row.nombre_condominio,
+            entidad_firma: row.entidad_firma,
+            banco_condominio: row.banco_condominio,
+            clabe_cuenta_condominio: row.clabe_cuenta_condominio,
+            administrador: row.administrador,
+            id_administracion: row.administrador || null,
+            permite_enganche: row.permite_enganche,
+            enganche_pct_3m: row.enganche_pct_3m,
+            enganche_pct_6m: row.enganche_pct_6m,
+            enganche_pct_12m: row.enganche_pct_12m,
+            permite_condonacion: row.permite_condonacion,
+            condonacion_pct_pago_unico: row.condonacion_pct_pago_unico,
+            condonacion_pct_plazos: row.condonacion_pct_plazos,
+            mensualidades_permitidas: row.mensualidades_permitidas,
+            opciones_convenio_habilitadas: row.opciones_convenio_habilitadas,
+          };
+
+          const { data: existingCondo, error: selectError } = await supabaseClient
+            .from('condominios').select('id_condominio')
+            .eq('id_condominio', row.id_condominio).maybeSingle();
+          if (selectError) throw selectError;
+
+          if (existingCondo) {
+            const { error: updateError } = await supabaseClient
+              .from('condominios').update(record)
+              .eq('id_condominio', row.id_condominio);
+            if (updateError) throw updateError;
+            updated++;
+          } else {
+            record.id_condominio = row.id_condominio;
+            record.fecha_alta = new Date().toISOString().split('T')[0];
+            const { error: insertError } = await supabaseClient.from('condominios').insert(record);
+            if (insertError) throw insertError;
+            created++;
+          }
+        } catch (err) {
+          errors++;
+          errorMessages.push(`Fila ${i + 1} (${row.id_condominio}): ${err.message || err}`);
+        }
+
+        if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+
+      progressBarCondoEl.style.transform = 'scaleX(1)';
+      progressTextCondoEl.textContent = '¡Proceso completado!';
+      countCreatedCondoEl.textContent = created;
+      countUpdatedCondoEl.textContent = updated;
+      countErrorsCondoEl.textContent  = errors;
+      show(resultsCondoEl);
+
+      if (errorMessages.length > 0) {
+        errorLogCondoEl.innerHTML = errorMessages.map(m => `• ${m}`).join('<br>');
+        show(errorLogCondoEl);
+      }
+
+      await loadDashboardDireccion();
+
+    } catch (err) {
+      showErrorCondo(`Error inesperado: ${err.message || err}`);
+      hide(progressCondoEl);
+    }
+
+    btnProcessCondoEl.disabled = false;
+    btnProcessCondoEl.textContent = '🚀 Procesar y cargar a Supabase';
   }
 
   // ── SELECCIÓN DE ARCHIVO (misma lógica de siempre) ──────────
