@@ -613,6 +613,44 @@
       <div class="error-log" id="errorLog"></div>
     </div>
 
+    <div class="card">
+      <h3>🏦 Actualizar datos bancarios y reglas de negociación de tu condominio</h3>
+      <p class="hint">Sube la misma plantilla (pestaña "Datos del Condominio") para actualizar la cuenta bancaria, enganche o condonación del condominio que tienes seleccionado arriba. Solo se actualiza TU condominio, sin importar qué otras filas traiga el archivo — nunca se toca el de otro administrador. No se usa para dar de alta un condominio nuevo (eso lo hace Kadena).</p>
+
+      <div class="file-selection-area">
+        <label for="fileInputMiCondo" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
+        <span class="file-hint">Formato aceptado: .xlsx</span>
+        <input type="file" id="fileInputMiCondo" accept=".xlsx">
+      </div>
+
+      <div class="file-info" id="fileInfoMiCondo">
+        <span class="file-info-icon">📊</span>
+        <div class="file-info-details">
+          <div class="file-info-name" id="fileNameMiCondo">—</div>
+          <div class="file-info-meta" id="fileMetaMiCondo">—</div>
+        </div>
+      </div>
+
+      <button class="btn-process" id="btnProcessMiCondo">🚀 Procesar y actualizar mi condominio</button>
+
+      <div class="alert alert-error" id="alertErrorMiCondo"></div>
+
+      <div class="progress-section" id="progressSectionMiCondo">
+        <div class="progress-text" id="progressTextMiCondo">Preparando...</div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarMiCondo"></div></div>
+      </div>
+
+      <div class="results" id="resultsMiCondo">
+        <h3>✅ Proceso completado</h3>
+        <div class="results-grid">
+          <div class="result-item updated"><span class="result-number" id="countUpdatedMiCondo">0</span><span class="result-label">Actualizado</span></div>
+          <div class="result-item errors"><span class="result-number" id="countErrorsMiCondo">0</span><span class="result-label">Errores</span></div>
+        </div>
+      </div>
+
+      <div class="error-log" id="errorLogMiCondo"></div>
+    </div>
+
   </div>
 
   <!-- ===================== PANEL DE DIRECCIÓN (Súper Administrador) ===================== -->
@@ -1948,6 +1986,162 @@
 
     btnProcessEl.disabled = false;
     btnProcessEl.textContent = '🚀 Procesar y cargar a Supabase';
+  }
+
+  // ── CARGADOR: Actualizar MI condominio (autoservicio, Portal de Administradores) ──
+  // Igual que el cargador de deudores: el condominio a escribir SIEMPRE es el
+  // seleccionado arriba (uploadTargetCondoId()), nunca el ID_Condominio que
+  // traiga el archivo — así un administrador no puede tocar, ni por error,
+  // los datos de otro condominio. Solo hace UPDATE (nunca crea un condominio
+  // nuevo: eso requiere Kadena, vía el Panel de Dirección) y no toca
+  // Administrador/id_administracion — esa clasificación de negocio la
+  // gestiona Kadena, no el administrador del condominio.
+  const fileInputMiCondoEl    = $('fileInputMiCondo');
+  const fileInfoMiCondoEl     = $('fileInfoMiCondo');
+  const fileNameMiCondoEl     = $('fileNameMiCondo');
+  const fileMetaMiCondoEl     = $('fileMetaMiCondo');
+  const btnProcessMiCondoEl   = $('btnProcessMiCondo');
+  const alertErrorMiCondoEl   = $('alertErrorMiCondo');
+  const progressMiCondoEl     = $('progressSectionMiCondo');
+  const progressTextMiCondoEl = $('progressTextMiCondo');
+  const progressBarMiCondoEl  = $('progressBarMiCondo');
+  const resultsMiCondoEl      = $('resultsMiCondo');
+  const countUpdatedMiCondoEl = $('countUpdatedMiCondo');
+  const countErrorsMiCondoEl  = $('countErrorsMiCondo');
+  const errorLogMiCondoEl     = $('errorLogMiCondo');
+  let selectedFileMiCondo = null;
+
+  function showErrorMiCondo(msg) { alertErrorMiCondoEl.textContent = msg; show(alertErrorMiCondoEl); }
+  function hideErrorMiCondo() { hide(alertErrorMiCondoEl); }
+  function resetResultsMiCondo() {
+    hide(resultsMiCondoEl); hide(progressMiCondoEl); hide(errorLogMiCondoEl); hideErrorMiCondo();
+    progressBarMiCondoEl.style.transform = 'scaleX(0)';
+    errorLogMiCondoEl.innerHTML = '';
+  }
+
+  if (fileInputMiCondoEl) {
+    fileInputMiCondoEl.addEventListener('click', function(e) { e.target.value = ''; });
+    fileInputMiCondoEl.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) handleFileSelectionMiCondo(e.target.files[0]);
+    });
+  }
+
+  function handleFileSelectionMiCondo(file) {
+    resetResultsMiCondo();
+    hideErrorMiCondo();
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      showErrorMiCondo('Solo se aceptan archivos .xlsx');
+      selectedFileMiCondo = null;
+      hide(fileInfoMiCondoEl); hide(btnProcessMiCondoEl);
+      return;
+    }
+    const targetCondo = uploadTargetCondoId();
+    if (!targetCondo) {
+      showErrorMiCondo('Selecciona primero UN condominio específico arriba (no "Todos").');
+      selectedFileMiCondo = null;
+      hide(fileInfoMiCondoEl); hide(btnProcessMiCondoEl);
+      return;
+    }
+    selectedFileMiCondo = file;
+    fileNameMiCondoEl.textContent = file.name;
+    fileMetaMiCondoEl.textContent = `${formatFileSize(file.size)} · Se actualizará: ${targetCondo.toUpperCase()}`;
+    show(fileInfoMiCondoEl); show(btnProcessMiCondoEl);
+  }
+
+  if (btnProcessMiCondoEl) btnProcessMiCondoEl.addEventListener('click', () => processFileMiCondo());
+
+  async function processFileMiCondo() {
+    if (!selectedFileMiCondo) return;
+    const targetCondo = uploadTargetCondoId();
+    if (!targetCondo) { showErrorMiCondo('Selecciona un condominio específico arriba antes de cargar.'); return; }
+
+    btnProcessMiCondoEl.disabled = true;
+    btnProcessMiCondoEl.textContent = '⏳ Procesando...';
+    resetResultsMiCondo();
+    show(progressMiCondoEl);
+    progressTextMiCondoEl.textContent = 'Leyendo archivo Excel...';
+
+    try {
+      const data = await selectedFileMiCondo.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const rows = parseCondominiosSheet(workbook);
+
+      if (rows.length === 0) {
+        showErrorMiCondo('No se encontró la hoja "Datos del Condominio" (o no tiene la columna ID_Condominio).');
+        btnProcessMiCondoEl.disabled = false;
+        btnProcessMiCondoEl.textContent = '🚀 Procesar y actualizar mi condominio';
+        hide(progressMiCondoEl);
+        return;
+      }
+
+      // Exigimos que el ID_Condominio de la fila coincida EXACTO con el
+      // condominio seleccionado arriba. Nunca asumimos "solo hay una fila,
+      // debe ser la mía" — un archivo equivocado (de otro condominio)
+      // aplicaría sus datos bancarios sin avisar, y aquí un error significa
+      // dinero yendo a la cuenta equivocada. Mejor obligar a corregir el
+      // ID_Condominio en el Excel que adivinar.
+      const row = rows.find(r => r.id_condominio.toLowerCase() === targetCondo.toLowerCase());
+
+      if (!row) {
+        const idsEncontrados = rows.map(r => r.id_condominio).join(', ');
+        showErrorMiCondo(`Ninguna fila del archivo tiene el ID_Condominio "${targetCondo}" (encontramos: ${idsEncontrados}). Corrige la columna ID_Condominio en el Excel para que coincida exacto y vuelve a intentar — por seguridad no adivinamos cuál fila es la tuya.`);
+        btnProcessMiCondoEl.disabled = false;
+        btnProcessMiCondoEl.textContent = '🚀 Procesar y actualizar mi condominio';
+        hide(progressMiCondoEl);
+        return;
+      }
+
+      progressTextMiCondoEl.textContent = 'Actualizando tu condominio...';
+      progressBarMiCondoEl.style.transform = 'scaleX(0.5)';
+
+      // Nunca incluimos administrador/id_administracion aquí: esa
+      // clasificación de negocio la gestiona Kadena desde el Panel de
+      // Dirección, no el propio administrador del condominio.
+      const record = {
+        entidad_firma: row.entidad_firma,
+        banco_condominio: row.banco_condominio,
+        clabe_cuenta_condominio: row.clabe_cuenta_condominio,
+        permite_enganche: row.permite_enganche,
+        enganche_pct_3m: row.enganche_pct_3m,
+        enganche_pct_6m: row.enganche_pct_6m,
+        enganche_pct_12m: row.enganche_pct_12m,
+        permite_condonacion: row.permite_condonacion,
+        condonacion_pct_pago_unico: row.condonacion_pct_pago_unico,
+        condonacion_pct_plazos: row.condonacion_pct_plazos,
+        mensualidades_permitidas: row.mensualidades_permitidas,
+        opciones_convenio_habilitadas: row.opciones_convenio_habilitadas,
+      };
+      if (row.nombre_condominio) record.nombre_condominio = row.nombre_condominio;
+
+      let updateError = null;
+      try {
+        const { error } = await supabaseClient
+          .from('condominios').update(record)
+          .eq('id_condominio', targetCondo);
+        updateError = error;
+      } catch (e) { updateError = e; }
+
+      progressBarMiCondoEl.style.transform = 'scaleX(1)';
+      progressTextMiCondoEl.textContent = '¡Proceso completado!';
+
+      if (updateError) {
+        countUpdatedMiCondoEl.textContent = 0;
+        countErrorsMiCondoEl.textContent = 1;
+        errorLogMiCondoEl.innerHTML = `• ${updateError.message || updateError}`;
+        show(errorLogMiCondoEl);
+      } else {
+        countUpdatedMiCondoEl.textContent = 1;
+        countErrorsMiCondoEl.textContent = 0;
+      }
+      show(resultsMiCondoEl);
+
+    } catch (err) {
+      showErrorMiCondo(`Error inesperado: ${err.message || err}`);
+      hide(progressMiCondoEl);
+    }
+
+    btnProcessMiCondoEl.disabled = false;
+    btnProcessMiCondoEl.textContent = '🚀 Procesar y actualizar mi condominio';
   }
 
   checkSession();
