@@ -1779,6 +1779,53 @@
     return s === '' ? null : s;
   }
 
+  // Normaliza el texto de un encabezado para comparar por nombre de columna
+  // sin importar mayúsculas, espacios o guiones bajos ("Adeudo Total" ==
+  // "adeudo_total" == "ADEUDO_TOTAL").
+  function normHeader(val) {
+    return String(val || '').toLowerCase().trim().replace(/[\s_]+/g, '');
+  }
+
+  // Busca, en las primeras 20 filas de una hoja, la fila de encabezados que
+  // trae una columna de nombre del deudor ("Nombre" o, en archivos viejos,
+  // "Propietario"), y devuelve el índice de esa fila más un mapa
+  // {campo: índiceDeColumna} para las demás columnas reconocidas.
+  const DEUDORES_COLUMN_ALIASES = {
+    nombre: ['nombre', 'propietario'],
+    lote: ['lote'],
+    tipo: ['tipo'],
+    telefono: ['telefono'],
+    correo: ['correo'],
+    habitan: ['habitan'],
+    residente_inquilino: ['residenteinquilino'],
+    meses_atraso: ['mesesatraso'],
+    adeudo_mantenimiento: ['adeudomantenimiento'],
+    adeudo_intereses: ['adeudointereses'],
+    cuotas_extraordinarias: ['cuotasextraordinarias'],
+    multas: ['multas'],
+    adeudo_total: ['adeudototal'],
+    motivo_adeudo: ['motivoadeudo'],
+    nivel_disposicion: ['niveldisposicion'],
+    probabilidad: ['probabilidad'],
+  };
+
+  function findDeudoresHeader(rawRows) {
+    for (let r = 0; r < Math.min(rawRows.length, 20); r++) {
+      const row = rawRows[r];
+      if (!row) continue;
+      const normalized = row.map(normHeader);
+      const nombreIdx = normalized.findIndex(h => DEUDORES_COLUMN_ALIASES.nombre.includes(h));
+      if (nombreIdx === -1) continue;
+      const idx = {};
+      for (const [field, aliases] of Object.entries(DEUDORES_COLUMN_ALIASES)) {
+        const i = normalized.findIndex(h => aliases.includes(h));
+        if (i !== -1) idx[field] = i;
+      }
+      return { headerIndex: r, idx };
+    }
+    return null;
+  }
+
   fileInputEl.addEventListener('click', function(e) { e.target.value = ''; });
   fileInputEl.addEventListener('change', (e) => {
     if (e.target.files && e.target.files.length > 0) handleFileSelection(e.target.files[0]);
@@ -1834,45 +1881,53 @@
         const sheet = workbook.Sheets[sheetName];
         const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
 
-        let headerIndex = -1;
-        for (let r = 0; r < Math.min(rawRows.length, 20); r++) {
-          const row = rawRows[r];
-          if (row && row.some(cell => typeof cell === 'string' && cell.toLowerCase().includes('propietario'))) {
-            headerIndex = r;
-            break;
-          }
-        }
-        if (headerIndex === -1) {
-          console.warn(`Hoja "${sheetName}" ignorada: no se encontró la columna "Propietario" en las primeras 20 filas.`);
+        const header = findDeudoresHeader(rawRows);
+        if (!header) {
+          console.warn(`Hoja "${sheetName}" ignorada: no se encontró una columna "Nombre" (o "Propietario") en las primeras 20 filas.`);
           continue;
         }
+        const idx = header.idx;
 
-        const dataRows = rawRows.slice(headerIndex + 1);
+        const dataRows = rawRows.slice(header.headerIndex + 1);
         for (const row of dataRows) {
-          const propietario = cleanText(row[3]);
-          const adeudoTotal  = cleanNumeric(row[13]);
-          if (!propietario) continue;
+          const nombre = cleanText(row[idx.nombre]);
+          if (!nombre) continue;
+
+          // El adeudo puede venir desglosado en 4 columnas (plantilla actual)
+          // o como un solo total (archivos viejos) — si trae desglose, el
+          // total se calcula sumando las 4 partes, nunca se deja en 0.
+          const tieneDesglose = ['adeudo_mantenimiento', 'adeudo_intereses', 'cuotas_extraordinarias', 'multas']
+            .some(campo => idx[campo] !== undefined);
+          const adeudoMantenimiento  = cleanNumeric(row[idx.adeudo_mantenimiento]) || 0;
+          const adeudoIntereses      = cleanNumeric(row[idx.adeudo_intereses]) || 0;
+          const cuotasExtraordinarias = cleanNumeric(row[idx.cuotas_extraordinarias]) || 0;
+          const multas               = cleanNumeric(row[idx.multas]) || 0;
+          const adeudoTotal = tieneDesglose
+            ? (adeudoMantenimiento + adeudoIntereses + cuotasExtraordinarias + multas)
+            : cleanNumeric(row[idx.adeudo_total]);
+
           if (adeudoTotal === null) {
-            console.warn(`Fila ignorada en hoja "${sheetName}" (Propietario: ${propietario}): no tiene "Adeudo Total" en la columna N.`);
+            console.warn(`Fila ignorada en hoja "${sheetName}" (Nombre: ${nombre}): no tiene ningún monto de adeudo (ni desglose ni total).`);
             continue;
           }
+
           allRows.push({
-            lote:                  cleanText(row[1]) || cleanText(row[2]),
-            casa_lote:             cleanText(row[2]),
-            propietario:           propietario,
-            correo:                cleanText(row[4]),
-            telefono:              cleanText(row[5]),
-            habitan:               cleanText(row[6]),
-            residente_inquilino:   cleanText(row[7]),
-            meses_atraso:          cleanText(row[8]),
-            adeudo_mantenimiento:  cleanNumeric(row[9]),
-            adeudo_intereses:      cleanNumeric(row[10]),
-            cuotas_extraordinarias: cleanNumeric(row[11]),
-            multas:                cleanNumeric(row[12]),
+            lote:                  cleanText(row[idx.lote]),
+            casa_lote:             cleanText(row[idx.tipo]),
+            propietario:           nombre,
+            correo:                cleanText(row[idx.correo]),
+            telefono:              cleanText(row[idx.telefono]),
+            habitan:               cleanText(row[idx.habitan]),
+            residente_inquilino:   cleanText(row[idx.residente_inquilino]),
+            meses_atraso:          cleanText(row[idx.meses_atraso]),
+            adeudo_mantenimiento:  adeudoMantenimiento,
+            adeudo_intereses:      adeudoIntereses,
+            cuotas_extraordinarias: cuotasExtraordinarias,
+            multas:                multas,
             adeudo_total:          adeudoTotal,
-            motivo_adeudo:         cleanText(row[14]),
-            nivel_disposicion:     cleanText(row[18]),
-            probabilidad:          cleanText(row[19]),
+            motivo_adeudo:         cleanText(row[idx.motivo_adeudo]),
+            nivel_disposicion:     cleanText(row[idx.nivel_disposicion]),
+            probabilidad:          cleanText(row[idx.probabilidad]),
             _sheetName:            sheetName
           });
         }
