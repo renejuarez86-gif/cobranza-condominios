@@ -1438,10 +1438,11 @@
 
     const filas = condominios.map(c => {
       const cargados = conteoPorCondo[c.id_condominio] || 0;
-      const contratadas = c.unidades_contratadas; // null hasta que Rene lo llene a mano
+      const contratadas = c.unidades_contratadas; // null hasta que se llene desde esta tabla
       const pct = (contratadas && contratadas > 0) ? Math.round((cargados / contratadas) * 100) : null;
       const excede = contratadas != null && cargados > contratadas; // dato imposible → alertar
       return {
+        id_condominio: c.id_condominio,
         nombre: c.nombre_condominio || c.id_condominio,
         administracion: nombrePorAdmin[c.id_administracion] || '—',
         contratadas, cargados, pct, excede,
@@ -1454,7 +1455,9 @@
       '</tr></thead><tbody>';
 
     filas.forEach(f => {
-      const contratadasTxt = (f.contratadas == null) ? '<span class="empty">sin definir</span>' : f.contratadas;
+      const inputId = `unidades-input-${escapeHtml(f.id_condominio)}`;
+      const contratadasTd = `<input type="number" class="pago-monto-input" id="${inputId}" value="${f.contratadas == null ? '' : f.contratadas}" min="0" step="1" placeholder="sin definir">
+        <button class="btn-mini btn-confirmar" onclick="guardarUnidadesContratadas('${escapeHtml(f.id_condominio)}')">💾 Guardar</button>`;
       const pctTxt = (f.pct == null) ? '—' : `${f.pct}%`;
       const estadoTxt = f.excede
         ? '<span class="heatmap-cell b3">⚠ Morosos superan lo contratado</span>'
@@ -1462,7 +1465,7 @@
       html += `<tr>
         <td>${escapeHtml(f.nombre)}</td>
         <td>${escapeHtml(f.administracion)}</td>
-        <td>${contratadasTxt}</td>
+        <td>${contratadasTd}</td>
         <td>${f.cargados}</td>
         <td>${pctTxt}</td>
         <td>${estadoTxt}</td>
@@ -1471,6 +1474,26 @@
 
     html += '</tbody></table>';
     $('reconUnidadesWrap').innerHTML = html || '<p class="empty">Sin condominios todavía.</p>';
+  }
+
+  async function guardarUnidadesContratadas(idCondominio) {
+    const input = $(`unidades-input-${idCondominio}`);
+    const raw = input ? input.value.trim() : '';
+    const valor = raw === '' ? null : parseInt(raw, 10);
+
+    if (raw !== '' && (isNaN(valor) || valor < 0)) {
+      alert('Ingresa un número entero válido (0 o más), o déjalo vacío para borrar el dato.');
+      return;
+    }
+
+    const { error } = await supabaseClient
+      .from('condominios')
+      .update({ unidades_contratadas: valor })
+      .eq('id_condominio', idCondominio);
+
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+
+    await loadDashboardDireccion();
   }
 
   // ── CARGADOR: Datos del Condominio (banco + negociación) ────────
