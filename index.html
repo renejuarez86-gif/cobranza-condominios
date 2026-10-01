@@ -1500,7 +1500,8 @@
 
     const { data: condominios } = await supabaseClient
       .from('condominios')
-      .select('id_condominio, nombre_condominio, id_administracion, unidades_contratadas');
+      .select('id_condominio, nombre_condominio, id_administracion, unidades_contratadas')
+      .order('nombre_condominio');
 
     const A = administraciones || [];
     const C = condominios || [];
