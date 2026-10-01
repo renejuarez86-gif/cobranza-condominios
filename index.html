@@ -35,6 +35,29 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     /* ═══════════════════════════════════════════════════════════
+       MOVIMIENTO — respeta "reducir movimiento" del sistema operativo.
+       Todo lo animado de aquí en adelante queda anulado si el usuario
+       lo pidió así (accesibilidad, no estético).
+       ═══════════════════════════════════════════════════════════ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes statPop {
+      from { opacity: 0; transform: translateY(8px) scale(.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
        TOKENS DE COLOR — claro (por defecto) y oscuro
        ═══════════════════════════════════════════════════════════ */
     :root {
@@ -246,7 +269,9 @@
     }
     #themeToggle { padding: 7px 10px; font-size: 15px; line-height: 1; }
     #logoutBtn { display: none; }
+    #themeToggle, #logoutBtn { transition: background-color .15s ease, transform .1s ease; }
     #themeToggle:hover, #logoutBtn:hover { background: var(--color-topbar-control-bg-hover); }
+    #themeToggle:active, #logoutBtn:active { transform: scale(.94); }
 
     .wrap { max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; }
 
@@ -259,6 +284,7 @@
       width: 100%;
       margin-bottom: 1.75rem;
       transition: background-color .15s ease;
+      animation: fadeInUp .5s cubic-bezier(.16,1,.3,1) both;
     }
     .card h2, .card h3 { color: var(--color-brand); margin-bottom: .6rem; }
     .card h3 { font-size: 16px; }
@@ -287,16 +313,33 @@
       cursor: pointer;
       margin-top: 18px;
       width: 100%;
+      transition: background-color .15s ease, transform .1s ease;
     }
     button.primary:hover { background: var(--color-brand-hover); }
+    button.primary:active { transform: scale(.98); }
     #loginError { color: var(--color-danger-strong); font-size: 13px; margin-top: 10px; display: none; }
 
     /* ── DASHBOARD ───────────────────────────────────────────── */
     #app { display: none; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 1.75rem; }
-    .stat { background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-stat); padding: 16px; transition: background-color .15s ease; }
-    .stat .num { font-size: 26px; font-weight: 700; color: var(--color-brand); }
+    .stat {
+      background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-stat); padding: 16px;
+      transition: background-color .15s ease, transform .18s cubic-bezier(.16,1,.3,1), box-shadow .18s ease;
+      animation: statPop .4s cubic-bezier(.16,1,.3,1) both;
+    }
+    .stat:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .stat .num { font-size: 26px; font-weight: 700; color: var(--color-brand); font-variant-numeric: tabular-nums; }
     .stat .label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
+    .stat.stat-info:hover    { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-info) 30%, transparent); }
+    .stat.stat-warning:hover { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-warning) 30%, transparent); }
+    .stat.stat-danger:hover  { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-danger) 30%, transparent); }
+    .stat.stat-success:hover { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-success) 30%, transparent); }
+    #statCards .stat:nth-child(1) { animation-delay: .02s; }
+    #statCards .stat:nth-child(2) { animation-delay: .07s; }
+    #statCards .stat:nth-child(3) { animation-delay: .12s; }
+    #statCards .stat:nth-child(4) { animation-delay: .17s; }
+    #statCards .stat:nth-child(5) { animation-delay: .22s; }
+    #statCards .stat:nth-child(6) { animation-delay: .27s; }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--color-border); }
@@ -345,10 +388,18 @@
 
     /* ── TARJETAS POR CONDOMINIO ──────────────────────────────── */
     .condo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-    .condo-card { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 12px; padding: 14px 16px; box-shadow: inset 0 4px 0 0 var(--color-border); }
+    .condo-card {
+      background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 12px; padding: 14px 16px;
+      box-shadow: inset 0 4px 0 0 var(--color-border);
+      transition: transform .18s cubic-bezier(.16,1,.3,1), box-shadow .18s ease;
+    }
     .condo-card.tier-good { box-shadow: inset 0 4px 0 0 var(--color-success); }
     .condo-card.tier-mid { box-shadow: inset 0 4px 0 0 var(--color-warning); }
     .condo-card.tier-bad { box-shadow: inset 0 4px 0 0 var(--color-danger); }
+    .condo-card:hover { transform: translateY(-2px); }
+    .condo-card.tier-good:hover { box-shadow: inset 0 4px 0 0 var(--color-success), 0 4px 16px color-mix(in srgb, var(--color-success) 25%, transparent); }
+    .condo-card.tier-mid:hover  { box-shadow: inset 0 4px 0 0 var(--color-warning), 0 4px 16px color-mix(in srgb, var(--color-warning) 25%, transparent); }
+    .condo-card.tier-bad:hover  { box-shadow: inset 0 4px 0 0 var(--color-danger), 0 4px 16px color-mix(in srgb, var(--color-danger) 25%, transparent); }
     .condo-card h5 { font-size: 13px; color: var(--color-text); margin-bottom: 6px; }
     .condo-card .condo-pct { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; color: var(--color-text-secondary); }
     .condo-card.tier-good .condo-pct { color: var(--color-success); }
@@ -380,7 +431,8 @@
     .pago-info { flex: 1; min-width: 200px; }
     .pago-info strong { color: var(--color-brand); }
     .pago-monto-input { width: 120px; padding: 6px 8px; border: 1px solid var(--color-border-input); border-radius: 6px; font-size: 13px; background: var(--color-surface); color: var(--color-text); }
-    .btn-mini { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-mini { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: background-color .15s ease, transform .1s ease; }
+    .btn-mini:active { transform: scale(.96); }
     .btn-confirmar { background: var(--color-success); color: #fff; }
     .btn-confirmar:hover { background: var(--color-success-hover); }
     .btn-rechazar { background: var(--color-surface); color: var(--color-danger); border: 1px solid var(--color-danger-border); }
@@ -405,8 +457,10 @@
       cursor: pointer;
       font-size: 1rem;
       margin-bottom: .75rem;
+      transition: background-color .15s ease, transform .1s ease;
     }
     .btn-select-file:hover { background: var(--color-brand-hover); }
+    .btn-select-file:active { transform: scale(.98); }
     .file-hint { display: block; font-size: .85rem; color: var(--color-text-muted); }
     #fileInput { display: none; }
 
@@ -420,8 +474,10 @@
     .btn-process {
       display: none; width: 100%; margin-top: 1.25rem; padding: .85rem; border: none; border-radius: 10px;
       background: var(--color-success); color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer;
+      transition: background-color .15s ease, transform .1s ease;
     }
     .btn-process:hover { background: var(--color-success-hover); }
+    .btn-process:active:not(:disabled) { transform: scale(.985); }
     .btn-process:disabled { background: var(--color-disabled-bg); cursor: not-allowed; }
     .btn-process.visible { display: block; }
 
@@ -452,6 +508,19 @@
     .alert-error { background: var(--color-danger-bg); color: var(--color-danger-strong); border: 1px solid var(--color-danger-border); }
 
     .footer { margin: 2rem 0 1rem; font-size: .75rem; color: var(--color-text-faint); text-align: center; }
+
+    /* ── RESPONSIVE: pantallas angostas (celular) ───────────────── */
+    @media (max-width: 480px) {
+      .wrap { padding: 1.25rem .75rem; }
+      .card { padding: 1.25rem 1.25rem; }
+      .topbar { padding: 12px 16px; }
+      .topbar h1 { font-size: 15px; }
+      .results-grid { grid-template-columns: 1fr; }
+      .gauge-wrap { width: 180px; height: 98px; }
+      .gauge-center .kpi-big { font-size: 26px; }
+      .kpi-big { font-size: 28px; }
+      .condo-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -757,6 +826,28 @@
   function show(el) { el.classList.add('visible'); }
   function hide(el) { el.classList.remove('visible'); }
 
+  // ── NÚMEROS CON CONTEO PROGRESIVO ───────────────────────────
+  // Anima el cambio de un KPI (en vez de solo "saltar" al nuevo valor) para
+  // que se note que el dato se actualizó. Se desactiva solo con "reducir
+  // movimiento" del sistema — el valor final siempre se pinta de inmediato.
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function animateNumber(el, target, format) {
+    format = format || (n => String(Math.round(n)));
+    const from = Number(el.dataset.rawValue) || 0;
+    el.dataset.rawValue = target;
+    if (prefersReducedMotion || from === target) { el.textContent = format(target); return; }
+
+    const duration = 500;
+    const start = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cúbico
+      el.textContent = format(from + (target - from) * eased);
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
   // ── TEMA CLARO / OSCURO ────────────────────────────────────
   function isDarkActive() {
     const explicit = document.documentElement.getAttribute('data-theme');
@@ -923,18 +1014,23 @@
   }
 
   function renderStats(deudores, convenios, pagos) {
-    $('statTotal').textContent = deudores.length;
-    $('statNegociacion').textContent = deudores.filter(d => d.estado_contacto === 'En_Negociacion').length;
-    $('statEscalados').textContent = deudores.filter(d => d.estado_contacto === 'Escalar_Abogado').length;
-    $('statFirmado').textContent = convenios.filter(c => c.estado === 'Convenio_Firmado').length;
+    animateNumber($('statTotal'), deudores.length);
+    animateNumber($('statNegociacion'), deudores.filter(d => d.estado_contacto === 'En_Negociacion').length);
+    animateNumber($('statEscalados'), deudores.filter(d => d.estado_contacto === 'Escalar_Abogado').length);
+    animateNumber($('statFirmado'), convenios.filter(c => c.estado === 'Convenio_Firmado').length);
 
     const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
     const pendiente = deudores.reduce((s, d) => s + Number(d.adeudo_total || 0), 0);
     const total = recuperado + pendiente;
     const pct = total > 0 ? Math.round((recuperado / total) * 100) : 0;
 
-    $('statPctRecuperacion').textContent = total > 0 ? `${pct}%` : '—';
-    $('statCarteraTotal').textContent = `$${pendiente.toLocaleString()}`;
+    if (total > 0) {
+      animateNumber($('statPctRecuperacion'), pct, n => `${Math.round(n)}%`);
+      animateNumber($('statCarteraTotal'), pendiente, n => `$${Math.round(n).toLocaleString()}`);
+    } else {
+      $('statPctRecuperacion').textContent = '—';
+      $('statCarteraTotal').textContent = `$${pendiente.toLocaleString()}`;
+    }
 
     const tierToStatClass = { good: 'stat-success', mid: 'stat-warning', bad: 'stat-danger' };
     $('statPctRecuperacionCard').className = 'stat' + (total > 0 ? ' ' + tierToStatClass[pctTier(pct)] : '');
@@ -1074,7 +1170,8 @@
     const totalHistorico = recuperado + pendiente;
     const pctRecuperacion = totalHistorico > 0 ? Math.round((recuperado / totalHistorico) * 100) : 0;
 
-    $('kpiRecuperacion').textContent = totalHistorico > 0 ? `${pctRecuperacion}%` : '—';
+    if (totalHistorico > 0) animateNumber($('kpiRecuperacion'), pctRecuperacion, n => `${Math.round(n)}%`);
+    else $('kpiRecuperacion').textContent = '—';
     $('kpiRecuperacionSub').textContent = totalHistorico > 0
       ? `$${recuperado.toLocaleString()} recuperados de $${totalHistorico.toLocaleString()} en total`
       : 'Aún no hay datos suficientes.';
