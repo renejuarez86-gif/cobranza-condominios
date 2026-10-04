@@ -1104,10 +1104,17 @@
       'Pago_Reportado': 'pend',
       'En_Proceso_Pago': 'pend',
       'Escalar_Abogado': 'pend',
+      'Escalado_Administrador': 'pend',
+      'Escalado_Reabierto': 'bad',
       'Rechazado': 'bad',
     };
+    // Estados que Lexia deja al agotar los recordatorios: nombre legible en vez del valor interno
+    const etiquetas = {
+      'Escalado_Administrador': 'Cerrado sin respuesta',
+      'Escalado_Reabierto': 'Escribió tras el cierre',
+    };
     const cls = map[estado] || 'neutral';
-    return `<span class="badge ${cls}">${estado || '—'}</span>`;
+    return `<span class="badge ${cls}">${etiquetas[estado] || estado || '—'}</span>`;
   }
 
   // Entra la tabla fila por fila (en vez de aparecer de golpe) al recargar
@@ -1520,12 +1527,16 @@
     const pendientesPago = pagos.filter(p => p.estado_pago === 'Pendiente').length;
     const conveniosEnviados = convenios.filter(c => c.estado === 'Convenio_Enviado_Espera_Firma').length;
     const escalados = deudores.filter(d => d.estado_contacto === 'Escalar_Abogado').length;
+    const reabiertos = deudores.filter(d => d.estado_contacto === 'Escalado_Reabierto').length;
+    const cerrados = deudores.filter(d => d.estado_contacto === 'Escalado_Administrador').length;
     const rechazados = pagos.filter(p => p.estado_pago === 'Rechazado').length;
 
     const acciones = [];
     if (pendientesPago > 0) acciones.push(`💰 ${pendientesPago} pago(s) reportado(s) esperando tu confirmación`);
     if (conveniosEnviados > 0) acciones.push(`📄 ${conveniosEnviados} convenio(s) enviados esperando firma del residente`);
     if (escalados > 0) acciones.push(`⚖️ ${escalados} residente(s) escalados a abogado — dales seguimiento legal`);
+    if (reabiertos > 0) acciones.push(`📩 ${reabiertos} residente(s) escribieron después del cierre — decide si retomas el plan de pagos o continúas por la vía legal`);
+    if (cerrados > 0) acciones.push(`📁 ${cerrados} cuenta(s) cerradas por falta de respuesta, pendientes de decisión de la administración`);
     if (!acciones.length) acciones.push('🎉 Sin pendientes urgentes por ahora.');
 
     const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
