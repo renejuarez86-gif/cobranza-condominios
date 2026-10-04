@@ -1132,8 +1132,15 @@
     const wrap = $('deudoresTableWrap');
     if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados.</p>'; return; }
     const showCondo = currentCondoId === 'ALL';
-    let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th></tr></thead><tbody>`;
+    // La columna de acciones solo aparece si algún residente escribió después del cierre
+    const hayReabiertos = rows.some(d => d.estado_contacto === 'Escalado_Reabierto');
+    let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th>${hayReabiertos ? '<th>Decisión</th>' : ''}</tr></thead><tbody>`;
     for (const d of rows) {
+      const idAttr = escapeHtml(d.id_deudor);
+      const decision = d.estado_contacto === 'Escalado_Reabierto'
+        ? `<button class="btn-mini btn-confirmar" onclick="retomarPlanCobro('${idAttr}')">↻ Retomar plan de cobro</button>
+           <button class="btn-mini btn-rechazar" onclick="continuarViaLegal('${idAttr}')">⚖ Continuar vía legal</button>`
+        : '';
       html += `<tr>
         <td>${escapeHtml(d.nombre)}</td>
         <td>${escapeHtml(d.lote)}</td>
@@ -1143,6 +1150,7 @@
         <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
         <td>${escapeHtml(d.nivel_disposicion || '—')}</td>
         <td>${estadoBadge(d.estado_contacto)}</td>
+        ${hayReabiertos ? `<td>${decision}</td>` : ''}
       </tr>`;
     }
     html += '</tbody></table>';
@@ -1228,6 +1236,37 @@
       .eq('id_deudor', idDeudor);
 
     await loadDashboard();
+  }
+
+  // ── DECISIÓN TRAS EL CIERRE ──────────────────────────────────
+  // Un residente que escribe después del mensaje de cierre queda en
+  // 'Escalado_Reabierto'. El administrador decide aquí; Lexia solo lee el estado.
+  async function decidirTrasCierre(idDeudor, cambios, mensajeError) {
+    const { data, error } = await supabaseClient
+      .from('deudores')
+      .update(cambios)
+      .eq('id_deudor', idDeudor)
+      .eq('estado_contacto', 'Escalado_Reabierto')
+      .select('id_deudor');
+    if (error) { alert(mensajeError + ': ' + error.message); return; }
+    if (!data || !data.length) { alert('No se aplicó el cambio: el estado del residente ya no es "Escribió tras el cierre". Recarga la página.'); }
+    await loadDashboard();
+  }
+
+  async function retomarPlanCobro(idDeudor) {
+    if (!confirm('¿Retomar el plan de cobro? Lexia le enviará de nuevo el recordatorio 1 por WhatsApp en la próxima corrida automática (lunes a viernes) y reiniciará la secuencia de seguimiento.')) return;
+    const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    await decidirTrasCierre(idDeudor,
+      { estado_contacto: 'Contactado', intentos_contacto: 1, fecha_actualizacion: ayer },
+      'No se pudo retomar el plan de cobro');
+  }
+
+  async function continuarViaLegal(idDeudor) {
+    if (!confirm('¿Continuar por la vía legal? Lexia dejará de contactar a este residente y la cuenta quedará como escalada a abogado.')) return;
+    const today = new Date().toISOString().split('T')[0];
+    await decidirTrasCierre(idDeudor,
+      { estado_contacto: 'Escalar_Abogado', fecha_actualizacion: today },
+      'No se pudo marcar la cuenta como vía legal');
   }
 
   async function rechazarPago(idPago) {
@@ -1535,7 +1574,7 @@
     if (pendientesPago > 0) acciones.push(`💰 ${pendientesPago} pago(s) reportado(s) esperando tu confirmación`);
     if (conveniosEnviados > 0) acciones.push(`📄 ${conveniosEnviados} convenio(s) enviados esperando firma del residente`);
     if (escalados > 0) acciones.push(`⚖️ ${escalados} residente(s) escalados a abogado — dales seguimiento legal`);
-    if (reabiertos > 0) acciones.push(`📩 ${reabiertos} residente(s) escribieron después del cierre — decide si retomas el plan de pagos o continúas por la vía legal`);
+    if (reabiertos > 0) acciones.push(`📩 ${reabiertos} residente(s) escribieron después del cierre — usa los botones de la tabla de residentes para retomar el plan de cobro o continuar por la vía legal`);
     if (cerrados > 0) acciones.push(`📁 ${cerrados} cuenta(s) cerradas por falta de respuesta, pendientes de decisión de la administración`);
     if (!acciones.length) acciones.push('🎉 Sin pendientes urgentes por ahora.');
 
