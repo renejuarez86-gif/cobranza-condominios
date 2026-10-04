@@ -772,6 +772,12 @@
     </div>
 
     <div class="card">
+      <h3>⏸ Pausa de Lexia por Administración</h3>
+      <p class="hint">Si una Administración no está al corriente con su pago, aquí puedes detener a Lexia para todos sus condominios a la vez. En pausa, Lexia no envía mensajes iniciales ni recordatorios, y si un residente escribe le responde un mensaje neutro (sin datos de pago). Al reanudar, la secuencia continúa donde se quedó en la siguiente corrida automática (lunes a viernes).</p>
+      <div class="tablewrap" id="pausaAdminWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+    <div class="card">
       <h3>📐 Reconciliación: morosos cargados vs. unidades contratadas</h3>
       <p class="hint">Compara cuántos deudores tiene cargado cada condominio contra las unidades que contrató — para detectar un archivo mal cargado antes de que cause un problema. No es un error si hay menos morosos cargados que unidades (no todas están siempre en mora); sí se alerta si hay más (dato imposible).</p>
       <div class="tablewrap" id="reconUnidadesWrap"><p class="empty">Cargando…</p></div>
@@ -1606,7 +1612,7 @@
   async function loadDashboardDireccion() {
     const { data: administraciones } = await supabaseClient
       .from('administraciones')
-      .select('id_administracion, nombre_administracion');
+      .select('id_administracion, nombre_administracion, lexia_pausada, lexia_pausada_desde');
 
     const { data: condominios } = await supabaseClient
       .from('condominios')
@@ -1639,7 +1645,64 @@
     $('kpiTotalRecuperado').textContent = `$${recuperadoTotal.toLocaleString()}`;
 
     renderRecuperacionPorAdministracionChart(administraciones, condominios, pagos);
+    renderPausaAdministraciones(administraciones, condominios, deudores);
     renderReconciliacionUnidades(administraciones, condominios, deudores);
+  }
+
+  // ── PAUSA DE LEXIA POR ADMINISTRACIÓN ────────────────────────
+  // administraciones.lexia_pausada es la fuente de verdad; un trigger en
+  // Supabase la copia a deudores.lexia_pausada, que es lo que leen los
+  // escenarios de Make (2A+2C no envía, 2B+M4 responde mensaje neutro).
+  function renderPausaAdministraciones(administraciones, condominios, deudores) {
+    const condosPorAdmin = {}, residentesPorCondo = {};
+    condominios.forEach(c => { (condosPorAdmin[c.id_administracion] = condosPorAdmin[c.id_administracion] || []).push(c.id_condominio); });
+    deudores.forEach(d => { residentesPorCondo[d.id_condominio] = (residentesPorCondo[d.id_condominio] || 0) + 1; });
+
+    if (!administraciones.length) { $('pausaAdminWrap').innerHTML = '<p class="empty">Sin administraciones todavía.</p>'; return; }
+
+    let html = '<table><thead><tr><th>Administración</th><th>Condominios</th><th>Residentes</th><th>Lexia</th><th>Acción</th></tr></thead><tbody>';
+    administraciones.forEach(a => {
+      const condos = condosPorAdmin[a.id_administracion] || [];
+      const residentes = condos.reduce((s, id) => s + (residentesPorCondo[id] || 0), 0);
+      const estado = a.lexia_pausada
+        ? `<span class="badge bad">En pausa${a.lexia_pausada_desde ? ' desde ' + new Date(a.lexia_pausada_desde).toLocaleDateString() : ''}</span>`
+        : '<span class="badge ok">Activa</span>';
+      const boton = a.lexia_pausada
+        ? `<button class="btn-mini btn-confirmar" data-id="${escapeHtml(a.id_administracion)}" onclick="cambiarPausaAdministracion(this.dataset.id, false)">▶ Reanudar Lexia</button>`
+        : `<button class="btn-mini btn-rechazar" data-id="${escapeHtml(a.id_administracion)}" onclick="cambiarPausaAdministracion(this.dataset.id, true)">⏸ Pausar Lexia</button>`;
+      html += `<tr>
+        <td>${escapeHtml(a.nombre_administracion)}</td>
+        <td>${condos.length}</td>
+        <td>${residentes}</td>
+        <td>${estado}</td>
+        <td>${boton}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    $('pausaAdminWrap').innerHTML = html;
+  }
+
+  async function cambiarPausaAdministracion(idAdministracion, pausar) {
+    const admin = ((lastDireccion && lastDireccion.administraciones) || []).find(a => a.id_administracion === idAdministracion);
+    const nombre = admin ? admin.nombre_administracion : idAdministracion;
+    const condos = ((lastDireccion && lastDireccion.condominios) || []).filter(c => c.id_administracion === idAdministracion);
+    const ids = new Set(condos.map(c => c.id_condominio));
+    const residentes = ((lastDireccion && lastDireccion.deudores) || []).filter(d => ids.has(d.id_condominio)).length;
+
+    const pregunta = pausar
+      ? `¿Pausar Lexia para "${nombre}"?\n\nSe detienen los envíos y recordatorios de ${residentes} residente(s) en ${condos.length} condominio(s). Si un residente escribe, Lexia le responderá un mensaje neutro y no enviará datos de pago.`
+      : `¿Reanudar Lexia para "${nombre}"?\n\nLos envíos continuarán en la próxima corrida automática (lunes a viernes), desde donde se quedaron.`;
+    if (!confirm(pregunta)) return;
+
+    const { data, error } = await supabaseClient
+      .from('administraciones')
+      .update({ lexia_pausada: pausar })
+      .eq('id_administracion', idAdministracion)
+      .select('id_administracion');
+    if (error) { alert('No se pudo cambiar el estado de Lexia: ' + error.message); return; }
+    if (!data || !data.length) { alert('No se aplicó el cambio (sin permiso o la Administración ya no existe). Recarga la página.'); return; }
+
+    await loadDashboardDireccion();
   }
 
   function renderRecuperacionPorAdministracionChart(administraciones, condominios, pagos) {
