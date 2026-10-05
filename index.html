@@ -1056,7 +1056,7 @@
 
     const { data: pagos } = await supabaseClient
       .from('pagos')
-      .select('id_pago, id_deudor, id_condominio, monto_pagado, fecha_pago, metodo_pago, referencia, estado_pago, fecha_actualizacion')
+      .select('id_pago, id_deudor, id_condominio, monto_pagado, fecha_pago, metodo_pago, referencia, estado_pago, fecha_actualizacion, clabe_validacion, monto_validacion, monto_esperado')
       .in('id_condominio', ids)
       .order('fecha_pago', { ascending: false });
 
@@ -1208,6 +1208,7 @@
         <div class="pago-info">
           <strong>${escapeHtml(nombre)}</strong> — Lote ${escapeHtml(lote)} (${escapeHtml(p.id_condominio)})<br>
           <span class="muted">Reportó pago el ${p.fecha_pago ? new Date(p.fecha_pago).toLocaleDateString() : '—'} · ${escapeHtml(p.metodo_pago || 'Transferencia')}</span>
+          ${alertasValidacionPago(p)}
         </div>
         <input type="number" class="pago-monto-input" id="monto-${escapeHtml(p.id_pago)}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01">
         <button class="btn-mini btn-confirmar" onclick="confirmarPago('${escapeHtml(p.id_pago)}', '${escapeHtml(p.id_deudor)}')">✅ Confirmar</button>
@@ -1215,6 +1216,22 @@
       </div>`;
     }
     wrap.innerHTML = html;
+  }
+
+  // Resultado de la lectura automática del comprobante (Lexia): cuenta destino vs. la del
+  // condominio, y monto vs. el convenio. Son señales para el administrador, no una garantía:
+  // la confirmación sigue siendo contra el estado de cuenta bancario.
+  function alertasValidacionPago(p) {
+    const chips = [];
+    if (p.clabe_validacion === 'SI') chips.push('<span class="badge ok">✓ Cuenta destino coincide</span>');
+    else if (p.clabe_validacion === 'NO') chips.push('<span class="badge bad">⚠ La cuenta destino NO coincide</span>');
+    else if (p.clabe_validacion === 'NO_VERIFICABLE') chips.push('<span class="badge pend">⚠ Cuenta destino no verificable en la imagen</span>');
+    if (p.monto_validacion === 'SI') chips.push('<span class="badge ok">✓ Monto igual al convenio</span>');
+    else if (p.monto_validacion === 'NO') {
+      const esp = p.monto_esperado != null ? ` ($${Number(p.monto_esperado).toLocaleString()} esperado)` : '';
+      chips.push(`<span class="badge pend">⚠ Monto distinto al convenio${esp}</span>`);
+    }
+    return chips.length ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">${chips.join('')}</div>` : '';
   }
 
   async function confirmarPago(idPago, idDeudor) {
