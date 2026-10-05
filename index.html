@@ -1045,7 +1045,7 @@
 
     const { data: deudores } = await supabaseClient
       .from('deudores')
-      .select('id_deudor, nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto, id_condominio')
+      .select('id_deudor, nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto, intentos_contacto, id_condominio')
       .in('id_condominio', ids);
 
     const { data: convenios } = await supabaseClient
@@ -1112,12 +1112,14 @@
       'Escalar_Abogado': 'pend',
       'Escalado_Administrador': 'pend',
       'Escalado_Reabierto': 'bad',
+      'Error_Envio': 'bad',
       'Rechazado': 'bad',
     };
     // Estados que Lexia deja al agotar los recordatorios: nombre legible en vez del valor interno
     const etiquetas = {
       'Escalado_Administrador': 'Cerrado sin respuesta',
       'Escalado_Reabierto': 'Escribió tras el cierre',
+      'Error_Envio': 'Error de envío',
     };
     const cls = map[estado] || 'neutral';
     return `<span class="badge ${cls}">${etiquetas[estado] || estado || '—'}</span>`;
@@ -1139,14 +1141,17 @@
     if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados.</p>'; return; }
     const showCondo = currentCondoId === 'ALL';
     // La columna de acciones solo aparece si algún residente escribió después del cierre
-    const hayReabiertos = rows.some(d => d.estado_contacto === 'Escalado_Reabierto');
+    const hayReabiertos = rows.some(d => d.estado_contacto === 'Escalado_Reabierto' || d.estado_contacto === 'Error_Envio');
     let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th>${hayReabiertos ? '<th>Decisión</th>' : ''}</tr></thead><tbody>`;
     for (const d of rows) {
       const idAttr = escapeHtml(d.id_deudor);
-      const decision = d.estado_contacto === 'Escalado_Reabierto'
-        ? `<button class="btn-mini btn-confirmar" onclick="retomarPlanCobro('${idAttr}')">↻ Retomar plan de cobro</button>
-           <button class="btn-mini btn-rechazar" onclick="continuarViaLegal('${idAttr}')">⚖ Continuar vía legal</button>`
-        : '';
+      let decision = '';
+      if (d.estado_contacto === 'Escalado_Reabierto') {
+        decision = `<button class="btn-mini btn-confirmar" onclick="retomarPlanCobro('${idAttr}')">↻ Retomar plan de cobro</button>
+           <button class="btn-mini btn-rechazar" onclick="continuarViaLegal('${idAttr}')">⚖ Continuar vía legal</button>`;
+      } else if (d.estado_contacto === 'Error_Envio') {
+        decision = `<button class="btn-mini btn-confirmar" onclick="reintentarEnvio('${idAttr}', ${Number(d.intentos_contacto || 0)})">↻ Reintentar envío</button>`;
+      }
       html += `<tr>
         <td>${escapeHtml(d.nombre)}</td>
         <td>${escapeHtml(d.lote)}</td>
@@ -1273,6 +1278,23 @@
     await decidirTrasCierre(idDeudor,
       { estado_contacto: 'Escalar_Abogado', fecha_actualizacion: today },
       'No se pudo marcar la cuenta como vía legal');
+  }
+
+  // Un envío rechazado por WhatsApp (teléfono inválido, número sin WhatsApp, etc.) deja al
+  // residente en 'Error_Envio' y fuera de la secuencia. Aquí se reintenta: si ya había
+  // recibido el mensaje inicial vuelve a 'Contactado' (sigue su secuencia), si no, a 'Pendiente'.
+  async function reintentarEnvio(idDeudor, intentos) {
+    if (!confirm('¿Reintentar el envío? Verifica antes que el teléfono del residente sea correcto. Lexia lo intentará de nuevo en la próxima corrida automática (lunes a viernes).')) return;
+    const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const { data, error } = await supabaseClient
+      .from('deudores')
+      .update({ estado_contacto: intentos >= 1 ? 'Contactado' : 'Pendiente', fecha_actualizacion: ayer })
+      .eq('id_deudor', idDeudor)
+      .eq('estado_contacto', 'Error_Envio')
+      .select('id_deudor');
+    if (error) { alert('No se pudo reintentar el envío: ' + error.message); return; }
+    if (!data || !data.length) { alert('No se aplicó el cambio: el estado del residente ya no es "Error de envío". Recarga la página.'); }
+    await loadDashboard();
   }
 
   async function rechazarPago(idPago) {
@@ -1574,6 +1596,7 @@
     const escalados = deudores.filter(d => d.estado_contacto === 'Escalar_Abogado').length;
     const reabiertos = deudores.filter(d => d.estado_contacto === 'Escalado_Reabierto').length;
     const cerrados = deudores.filter(d => d.estado_contacto === 'Escalado_Administrador').length;
+    const conError = deudores.filter(d => d.estado_contacto === 'Error_Envio').length;
     const rechazados = pagos.filter(p => p.estado_pago === 'Rechazado').length;
 
     const acciones = [];
@@ -1582,6 +1605,7 @@
     if (escalados > 0) acciones.push(`⚖️ ${escalados} residente(s) escalados a abogado — dales seguimiento legal`);
     if (reabiertos > 0) acciones.push(`📩 ${reabiertos} residente(s) escribieron después del cierre — usa los botones de la tabla de residentes para retomar el plan de cobro o continuar por la vía legal`);
     if (cerrados > 0) acciones.push(`📁 ${cerrados} cuenta(s) cerradas por falta de respuesta, pendientes de decisión de la administración`);
+    if (conError > 0) acciones.push(`📵 ${conError} residente(s) con error de envío de WhatsApp — revisa que su teléfono sea correcto y usa "Reintentar envío" en la tabla de residentes`);
     if (!acciones.length) acciones.push('🎉 Sin pendientes urgentes por ahora.');
 
     const recuperado = pagos.filter(p => p.estado_pago === 'Confirmado').reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
