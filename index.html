@@ -1224,7 +1224,7 @@
   function alertasValidacionPago(p) {
     const chips = [];
     if (p.clabe_validacion === 'SI') chips.push('<span class="badge ok">✓ Cuenta destino coincide</span>');
-    else if (p.clabe_validacion === 'NO') chips.push('<span class="badge bad">⚠ La cuenta destino NO coincide</span>');
+    else if (p.clabe_validacion === 'DISTINTA') chips.push('<span class="badge bad">⚠ La cuenta destino NO coincide</span>');
     else if (p.clabe_validacion === 'NO_VERIFICABLE') chips.push('<span class="badge pend">⚠ Cuenta destino no verificable en la imagen</span>');
     if (p.monto_validacion === 'SI') chips.push('<span class="badge ok">✓ Monto igual al convenio</span>');
     else if (p.monto_validacion === 'NO') {
