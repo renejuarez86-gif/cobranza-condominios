@@ -1056,7 +1056,7 @@
 
     const { data: pagos } = await supabaseClient
       .from('pagos')
-      .select('id_pago, id_deudor, id_condominio, monto_pagado, fecha_pago, metodo_pago, referencia, estado_pago, fecha_actualizacion, clabe_validacion, monto_validacion, monto_esperado')
+      .select('id_pago, id_deudor, id_condominio, monto_pagado, fecha_pago, metodo_pago, referencia, estado_pago, fecha_actualizacion, clabe_validacion, monto_validacion, monto_esperado, id_convenio')
       .in('id_condominio', ids)
       .order('fecha_pago', { ascending: false });
 
@@ -1182,7 +1182,7 @@
         <td>${c.num_mensualidades ?? '—'}</td>
         <td>$${Number(c.monto_mensualidad || 0).toLocaleString()}</td>
         <td>${estadoBadge(c.estado)}</td>
-        <td>${c.fecha_actualizacion ? new Date(c.fecha_actualizacion).toLocaleDateString() : '—'}</td>
+        <td>${fechaCorta(c.fecha_actualizacion)}</td>
       </tr>`;
     }
     html += '</tbody></table>';
@@ -1207,11 +1207,11 @@
       html += `<div class="pago-row">
         <div class="pago-info">
           <strong>${escapeHtml(nombre)}</strong> — Lote ${escapeHtml(lote)} (${escapeHtml(p.id_condominio)})<br>
-          <span class="muted">Reportó pago el ${p.fecha_pago ? new Date(p.fecha_pago).toLocaleDateString() : '—'} · ${escapeHtml(p.metodo_pago || 'Transferencia')}</span>
+          <span class="muted">Reportó pago el ${fechaCorta(p.fecha_pago)} · ${escapeHtml(p.metodo_pago || 'Transferencia')}</span>
           ${alertasValidacionPago(p)}
         </div>
         <input type="number" class="pago-monto-input" id="monto-${escapeHtml(p.id_pago)}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01">
-        <button class="btn-mini btn-confirmar" onclick="confirmarPago('${escapeHtml(p.id_pago)}', '${escapeHtml(p.id_deudor)}')">✅ Confirmar</button>
+        <button class="btn-mini btn-confirmar" onclick="confirmarPago('${escapeHtml(p.id_pago)}', '${escapeHtml(p.id_deudor)}', ${p.id_convenio ? 'true' : 'false'})">✅ Confirmar</button>
         <button class="btn-mini btn-rechazar" onclick="rechazarPago('${escapeHtml(p.id_pago)}')">✖ Rechazar</button>
       </div>`;
     }
@@ -1234,7 +1234,7 @@
     return chips.length ? `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">${chips.join('')}</div>` : '';
   }
 
-  async function confirmarPago(idPago, idDeudor) {
+  async function confirmarPago(idPago, idDeudor, tieneConvenio) {
     const input = $(`monto-${idPago}`);
     const monto = Number(input ? input.value : 0);
     if (!monto || monto <= 0) { alert('Ingresa un monto válido antes de confirmar.'); return; }
@@ -1256,7 +1256,8 @@
 
     const saldoActual = Number((deudorRow && deudorRow.adeudo_total) || 0);
     const nuevoSaldo = Math.max(0, saldoActual - monto);
-    const nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : 'En_Negociacion';
+    // Con convenio firmado, un pago parcial no regresa al residente a negociación: sigue con su convenio
+    const nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : (tieneConvenio ? 'Convenio_Firmado' : 'En_Negociacion');
 
     await supabaseClient
       .from('deudores')
@@ -1659,6 +1660,15 @@
 
     $('accionesWrap').innerHTML = `<ul class="info-list">${acciones.map(a => `<li>${a}</li>`).join('')}</ul>`;
     $('logrosWrap').innerHTML = `<ul class="info-list">${logros.map(l => `<li>${l}</li>`).join('')}</ul>`;
+  }
+
+  // Las fechas sin hora ("2026-10-11") se interpretan como medianoche UTC; en México/El Salvador
+  // eso las mostraba un día antes. Se arman como fecha local.
+  function fechaCorta(valor) {
+    if (!valor) return '—';
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor));
+    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(valor);
+    return isNaN(d) ? '—' : d.toLocaleDateString();
   }
 
   function escapeHtml(s) {
