@@ -1156,7 +1156,7 @@
         <td>${escapeHtml(d.nombre)}</td>
         <td>${escapeHtml(d.lote)}</td>
         ${showCondo ? `<td>${escapeHtml(d.id_condominio)}</td>` : ''}
-        <td>$${Number(d.adeudo_total || 0).toLocaleString()}</td>
+        <td>$${Number(d.adeudo_total || 0).toLocaleString()} <button class="btn-mini" title="Corregir saldo pendiente" data-id="${idAttr}" data-saldo="${Number(d.adeudo_total || 0)}" data-nombre="${escapeHtml(d.nombre)}" onclick="corregirSaldo(this.dataset.id, Number(this.dataset.saldo), this.dataset.nombre)">✏️</button></td>
         <td>${escapeHtml(d.meses_atraso ?? '—')}</td>
         <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
         <td>${escapeHtml(d.nivel_disposicion || '—')}</td>
@@ -1300,6 +1300,29 @@
   // Un envío rechazado por WhatsApp (teléfono inválido, número sin WhatsApp, etc.) deja al
   // residente en 'Error_Envio' y fuera de la secuencia. Aquí se reintenta: si ya había
   // recibido el mensaje inicial vuelve a 'Contactado' (sigue su secuencia), si no, a 'Pendiente'.
+  // N8 (a): el administrador corrige a mano el saldo pendiente de un residente (por ejemplo, un
+  // pago recibido por fuera de Lexia). Lexia usa este saldo como contexto en sus mensajes.
+  async function corregirSaldo(idDeudor, saldoActual, nombre) {
+    const texto = prompt(`Saldo pendiente actual de ${nombre}: $${Number(saldoActual).toLocaleString()}\n\nEscribe el nuevo saldo pendiente (solo números, sin $ ni comas):`, String(saldoActual));
+    if (texto === null) return;
+    const nuevo = Number(String(texto).replace(/[$,\s]/g, ''));
+    if (!isFinite(nuevo) || nuevo < 0) { alert('Ingresa un monto válido (0 o mayor).'); return; }
+    if (nuevo === Number(saldoActual)) return;
+    const aviso = nuevo === 0 ? '\n\nCon saldo $0 el residente quedará como "Pagado" y Lexia dejará de cobrarle.' : '';
+    if (!confirm(`¿Cambiar el saldo de ${nombre} de $${Number(saldoActual).toLocaleString()} a $${nuevo.toLocaleString()}?${aviso}`)) return;
+    const today = new Date().toISOString().split('T')[0];
+    const cambios = { adeudo_total: nuevo, fecha_actualizacion: today };
+    if (nuevo === 0) cambios.estado_contacto = 'Pagado';
+    const { data, error } = await supabaseClient
+      .from('deudores')
+      .update(cambios)
+      .eq('id_deudor', idDeudor)
+      .select('id_deudor');
+    if (error) { alert('No se pudo corregir el saldo: ' + error.message); return; }
+    if (!data || !data.length) { alert('No se aplicó el cambio (sin permiso o el residente ya no existe). Recarga la página.'); return; }
+    await loadDashboard();
+  }
+
   async function reintentarEnvio(idDeudor, intentos) {
     if (!confirm('¿Reintentar el envío? Verifica antes que el teléfono del residente sea correcto. Lexia lo intentará de nuevo en la próxima corrida automática (lunes a viernes).')) return;
     const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
