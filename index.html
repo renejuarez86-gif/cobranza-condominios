@@ -665,6 +665,12 @@
     </div>
 
     <div class="card">
+      <h3>🧾 Historial de pagos</h3>
+      <p class="hint">Todos los pagos reportados por los residentes, con su estado. Si un pago se confirmó con un monto equivocado, corrígelo aquí: el saldo del residente se ajusta automáticamente por la diferencia.</p>
+      <div class="tablewrap" id="historialPagosWrap"><p class="empty">Cargando…</p></div>
+    </div>
+
+    <div class="card">
       <h3>Residentes con saldo pendiente</h3>
       <div class="tablewrap" id="deudoresTableWrap"><p class="empty">Cargando…</p></div>
     </div>
@@ -1066,6 +1072,7 @@
     renderDeudoresTable(D);
     renderConveniosTable(C);
     renderPagosPendientes(P, D);
+    renderHistorialPagos(P, D);
     renderEjecutivo(D, C, P);
     renderAlertasYLogros(D, C, P);
 
@@ -1188,6 +1195,69 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
     staggerRows(wrap);
+  }
+
+  // ── HISTORIAL DE PAGOS ───────────────────────────────────────
+  // Todos los pagos (pendientes, confirmados y rechazados). En los confirmados el
+  // administrador puede corregir el monto; el saldo del residente se ajusta por la diferencia.
+  function renderHistorialPagos(pagos, deudores) {
+    const wrap = $('historialPagosWrap');
+    if (!wrap) return;
+    if (!pagos.length) { wrap.innerHTML = '<p class="empty">Todavía no hay pagos registrados.</p>'; return; }
+    const deudorPorId = {};
+    deudores.forEach(d => { deudorPorId[d.id_deudor] = d; });
+    const showCondo = currentCondoId === 'ALL';
+    let html = `<table><thead><tr><th>Residente</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Fecha</th><th>Monto</th><th>Estado</th><th>Corregir monto</th></tr></thead><tbody>`;
+    for (const p of pagos) {
+      const d = deudorPorId[p.id_deudor];
+      const idPago = escapeHtml(p.id_pago);
+      const accion = p.estado_pago === 'Confirmado'
+        ? `<input type="number" class="pago-monto-input" id="hist-monto-${idPago}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01">
+           <button class="btn-mini btn-confirmar" data-id="${idPago}" data-deudor="${escapeHtml(p.id_deudor)}" data-monto="${Number(p.monto_pagado || 0)}" onclick="corregirMontoPago(this.dataset.id, this.dataset.deudor, Number(this.dataset.monto))">💾 Guardar</button>`
+        : '<span class="muted">—</span>';
+      html += `<tr>
+        <td>${escapeHtml(d ? d.nombre : p.id_deudor)}</td>
+        <td>${escapeHtml(d ? d.lote : '—')}</td>
+        ${showCondo ? `<td>${escapeHtml(p.id_condominio)}</td>` : ''}
+        <td>${fechaCorta(p.fecha_pago)}</td>
+        <td>$${Number(p.monto_pagado || 0).toLocaleString()}</td>
+        <td>${estadoBadge(p.estado_pago)}${alertasValidacionPago(p)}</td>
+        <td>${accion}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    staggerRows(wrap);
+  }
+
+  async function corregirMontoPago(idPago, idDeudor, montoAnterior) {
+    const input = $(`hist-monto-${idPago}`);
+    const nuevo = Number(input ? input.value : NaN);
+    if (!isFinite(nuevo) || nuevo < 0) { alert('Ingresa un monto válido (0 o mayor).'); return; }
+    if (nuevo === montoAnterior) { alert('El monto no cambió.'); return; }
+
+    const { data: deudorRow, error: errSel } = await supabaseClient
+      .from('deudores').select('adeudo_total, estado_contacto, nombre').eq('id_deudor', idDeudor).maybeSingle();
+    if (errSel || !deudorRow) { alert('No se pudo leer el saldo del residente. Recarga la página.'); return; }
+
+    const saldoActual = Number(deudorRow.adeudo_total || 0);
+    const saldoNuevo = Math.max(0, Math.round((saldoActual + montoAnterior - nuevo) * 100) / 100);
+    const aviso = saldoNuevo === 0 ? '\n\nCon saldo $0 el residente quedará como "Pagado" y Lexia dejará de cobrarle.' : '';
+    if (!confirm(`¿Corregir el pago de ${deudorRow.nombre || 'este residente'} de $${montoAnterior.toLocaleString()} a $${nuevo.toLocaleString()}?\n\nSu saldo pendiente pasará de $${saldoActual.toLocaleString()} a $${saldoNuevo.toLocaleString()}.${aviso}`)) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const { data: pagoUpd, error: errPago } = await supabaseClient
+      .from('pagos').update({ monto_pagado: nuevo, fecha_actualizacion: today })
+      .eq('id_pago', idPago).eq('estado_pago', 'Confirmado').select('id_pago');
+    if (errPago) { alert('No se pudo corregir el pago: ' + errPago.message); return; }
+    if (!pagoUpd || !pagoUpd.length) { alert('No se aplicó el cambio (sin permiso o el pago ya no está confirmado). Recarga la página.'); return; }
+
+    const cambios = { adeudo_total: saldoNuevo, fecha_actualizacion: today };
+    if (saldoNuevo === 0) cambios.estado_contacto = 'Pagado';
+    const { error: errDeudor } = await supabaseClient.from('deudores').update(cambios).eq('id_deudor', idDeudor);
+    if (errDeudor) { alert('Se corrigió el pago, pero no se pudo ajustar el saldo: ' + errDeudor.message + '. Avísale al equipo de soporte.'); }
+
+    await loadDashboard();
   }
 
   // ── PAGOS POR CONFIRMAR ──────────────────────────────────────
