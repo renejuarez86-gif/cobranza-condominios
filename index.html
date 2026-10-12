@@ -675,6 +675,12 @@
       <div class="tablewrap" id="deudoresTableWrap"><p class="empty">Cargando…</p></div>
     </div>
 
+    <div class="card" id="bajasCard" style="display:none;">
+      <h3>🗂 Residentes dados de baja</h3>
+      <p class="hint">Residentes que ya no venían en el archivo de morosidad y se dieron de baja al cargarlo. Lexia no los contacta y no cuentan en los indicadores. Su historial se conserva; si alguno vuelve a estar en mora, aparecerá de nuevo al subirlo en el archivo, o puedes reactivarlo aquí.</p>
+      <div class="tablewrap" id="bajasWrap"></div>
+    </div>
+
     <div class="card">
       <h3>Convenios de pago</h3>
       <div class="tablewrap" id="conveniosTableWrap"><p class="empty">Cargando…</p></div>
@@ -1066,13 +1072,17 @@
       .in('id_condominio', ids)
       .order('fecha_pago', { ascending: false });
 
-    const D = deudores || [], C = convenios || [], P = pagos || [];
+    // Los residentes dados de baja (N3) no cuentan en el tablero; se listan aparte para poder reactivarlos
+    const Dall = deudores || [], C = convenios || [], P = pagos || [];
+    const D = Dall.filter(d => d.estado_contacto !== 'Baja');
+    const B = Dall.filter(d => d.estado_contacto === 'Baja');
 
     renderStats(D, C, P);
     renderDeudoresTable(D);
+    renderBajas(B);
     renderConveniosTable(C);
-    renderPagosPendientes(P, D);
-    renderHistorialPagos(P, D);
+    renderPagosPendientes(P, Dall);
+    renderHistorialPagos(P, Dall);
     renderEjecutivo(D, C, P);
     renderAlertasYLogros(D, C, P);
 
@@ -1195,6 +1205,41 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
     staggerRows(wrap);
+  }
+
+  // ── RESIDENTES DADOS DE BAJA (N3) ────────────────────────────
+  function renderBajas(bajas) {
+    const card = $('bajasCard'), wrap = $('bajasWrap');
+    if (!card || !wrap) return;
+    if (!bajas.length) { card.style.display = 'none'; wrap.innerHTML = ''; return; }
+    card.style.display = '';
+    const showCondo = currentCondoId === 'ALL';
+    let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Último saldo</th><th>Acción</th></tr></thead><tbody>`;
+    for (const d of bajas) {
+      html += `<tr>
+        <td>${escapeHtml(d.nombre)}</td>
+        <td>${escapeHtml(d.lote)}</td>
+        ${showCondo ? `<td>${escapeHtml(d.id_condominio)}</td>` : ''}
+        <td>$${Number(d.adeudo_total || 0).toLocaleString()}</td>
+        <td><button class="btn-mini btn-confirmar" data-id="${escapeHtml(d.id_deudor)}" data-nombre="${escapeHtml(d.nombre)}" onclick="reactivarResidente(this.dataset.id, this.dataset.nombre)">↻ Reactivar</button></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  async function reactivarResidente(idDeudor, nombre) {
+    if (!confirm(`¿Reactivar a ${nombre}? Volverá al tablero y Lexia le enviará de nuevo el mensaje inicial en la próxima corrida automática (lunes a viernes).`)) return;
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabaseClient
+      .from('deudores')
+      .update({ estado_contacto: 'Pendiente', intentos_contacto: 0, fecha_actualizacion: today })
+      .eq('id_deudor', idDeudor)
+      .eq('estado_contacto', 'Baja')
+      .select('id_deudor');
+    if (error) { alert('No se pudo reactivar: ' + error.message); return; }
+    if (!data || !data.length) { alert('No se aplicó el cambio (el residente ya no está dado de baja). Recarga la página.'); }
+    await loadDashboard();
   }
 
   // ── HISTORIAL DE PAGOS ───────────────────────────────────────
@@ -1624,7 +1669,8 @@
     const { data: deudoresAll } = await supabaseClient
       .from('deudores')
       .select('id_condominio, adeudo_total, meses_atraso, estado_contacto')
-      .in('id_condominio', ids);
+      .in('id_condominio', ids)
+      .or('estado_contacto.is.null,estado_contacto.neq.Baja');
     const { data: conveniosAll } = await supabaseClient
       .from('convenios')
       .select('id_condominio, estado')
@@ -1770,7 +1816,7 @@
     let D = [], P = [];
     if (ids.length) {
       const { data: deudoresAll } = await supabaseClient
-        .from('deudores').select('id_condominio').in('id_condominio', ids);
+        .from('deudores').select('id_condominio').in('id_condominio', ids).or('estado_contacto.is.null,estado_contacto.neq.Baja');
       const { data: pagosAll } = await supabaseClient
         .from('pagos').select('id_condominio, monto_pagado, estado_pago').in('id_condominio', ids);
       D = deudoresAll || [];
@@ -2434,6 +2480,20 @@
         return;
       }
 
+      // N3: residentes de este condominio que ya no vienen en el archivo → proponer darlos de baja
+      const lotesArchivo = new Set(allRows.map(r => String(r.lote ?? '').trim()));
+      const { data: existentes, error: errExist } = await supabaseClient
+        .from('deudores').select('id_deudor, nombre, lote, estado_contacto').eq('id_condominio', targetCondo);
+      if (errExist) throw errExist;
+      const faltantes = (existentes || []).filter(d => d.estado_contacto !== 'Baja' && !lotesArchivo.has(String(d.lote ?? '').trim()));
+      let darDeBaja = false;
+      if (faltantes.length) {
+        const lista = faltantes.slice(0, 15).map(d => `• ${d.nombre} (lote ${d.lote}) — ${d.estado_contacto || 'sin estado'}`).join('\n');
+        const mas = faltantes.length > 15 ? `\n… y ${faltantes.length - 15} más` : '';
+        darDeBaja = confirm(`${faltantes.length} residente(s) de ${targetCondo.toUpperCase()} ya no vienen en este archivo:\n\n${lista}${mas}\n\n¿Darlos de baja? Lexia dejará de contactarlos y ya no aparecerán en el tablero. Su historial se conserva y se pueden reactivar.\n\nAceptar = cargar el archivo y darlos de baja\nCancelar = cargar el archivo sin dar de baja a nadie`);
+      }
+      let reactivados = 0, bajas = 0;
+
       progressTextEl.textContent = `Se encontraron ${allRows.length} filas válidas. Iniciando carga...`;
 
       let inserted = 0, updated = 0, errors = 0;
@@ -2483,7 +2543,7 @@
         try {
           const { data: existing, error: selectError } = await supabaseClient
             .from('deudores')
-            .select('id_deudor')
+            .select('id_deudor, estado_contacto')
             .eq('lote', row.lote)
             .eq('id_condominio', targetCondo)
             .maybeSingle();
@@ -2491,6 +2551,12 @@
           if (selectError) throw selectError;
 
           if (existing) {
+            // Si estaba dado de baja y vuelve a venir en el archivo, se reactiva desde cero
+            if (existing.estado_contacto === 'Baja') {
+              record.estado_contacto = 'Pendiente';
+              record.intentos_contacto = 0;
+              reactivados++;
+            }
             const { error: updateError } = await supabaseClient
               .from('deudores')
               .update(record)
@@ -2513,8 +2579,22 @@
         if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
       }
 
+      if (darDeBaja) {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: bajaData, error: bajaErr } = await supabaseClient
+          .from('deudores')
+          .update({ estado_contacto: 'Baja', fecha_actualizacion: today })
+          .in('id_deudor', faltantes.map(d => d.id_deudor))
+          .select('id_deudor');
+        if (bajaErr) { errorMessages.push(`No se pudieron dar de baja los residentes que ya no venían: ${bajaErr.message}`); }
+        else bajas = (bajaData || []).length;
+      }
+
       progressBarEl.style.transform = 'scaleX(1)';
-      progressTextEl.textContent = '¡Proceso completado!';
+      const extras = [];
+      if (bajas) extras.push(`${bajas} dado(s) de baja`);
+      if (reactivados) extras.push(`${reactivados} reactivado(s)`);
+      progressTextEl.textContent = '¡Proceso completado!' + (extras.length ? ' · ' + extras.join(' · ') : '');
       countInsertedEl.textContent = inserted;
       countUpdatedEl.textContent  = updated;
       countErrorsEl.textContent   = errors;
