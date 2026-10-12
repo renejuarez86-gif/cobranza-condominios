@@ -1808,9 +1808,10 @@
   // eso las mostraba un día antes. Se arman como fecha local.
   function fechaCorta(valor) {
     if (!valor) return '—';
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor));
+    // También "2026-10-11T00:00:00+00:00": columnas timestamp que en realidad guardan solo un día
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]00:00:00(?:\.0+)?(?:Z|[+-]00(?::?00)?)?)?$/.exec(String(valor));
     const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(valor);
-    return isNaN(d) ? '—' : d.toLocaleDateString();
+    return isNaN(d) ? '—' : d.toLocaleDateString('es-MX');
   }
 
   function escapeHtml(s) {
@@ -1881,7 +1882,7 @@
       const condos = condosPorAdmin[a.id_administracion] || [];
       const residentes = condos.reduce((s, id) => s + (residentesPorCondo[id] || 0), 0);
       const estado = a.lexia_pausada
-        ? `<span class="badge bad">En pausa${a.lexia_pausada_desde ? ' desde ' + new Date(a.lexia_pausada_desde).toLocaleDateString() : ''}</span>`
+        ? `<span class="badge bad">En pausa${a.lexia_pausada_desde ? ' desde ' + new Date(a.lexia_pausada_desde).toLocaleDateString('es-MX') : ''}</span>`
         : '<span class="badge ok">Activa</span>';
       const boton = a.lexia_pausada
         ? `<button class="btn-mini btn-confirmar" data-id="${escapeHtml(a.id_administracion)}" onclick="cambiarPausaAdministracion(this.dataset.id, false)">▶ Reanudar Lexia</button>`
