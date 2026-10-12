@@ -854,6 +854,7 @@
   let selectedFile = null;
   let esSuperAdministrador = false; // true = usuario del Panel de Dirección (ver tabla super_administradores)
   let lastEjecutivo = null;  // último {deudores, convenios, pagos} — para redibujar las gráficas al cambiar de tema
+  let seguimientoPorDeudor = {};  // id_deudor -> seguimiento de cuotas del convenio (N8)
   let lastDireccion = null;  // último {administraciones, condominios, deudores, pagos} — ídem, para el Panel de Dirección
   const charts = {};         // instancias de Chart.js activas
 
@@ -1072,6 +1073,14 @@
       .in('id_condominio', ids)
       .order('fecha_pago', { ascending: false });
 
+    // N8: seguimiento de cuotas de convenios firmados (atraso y próximo pago), calculado en Supabase
+    const { data: seguimiento } = await supabaseClient
+      .from('v_seguimiento_convenios')
+      .select('id_deudor, atrasado, dias_atraso, monto_atrasado, proxima_fecha, proxima_monto, liquidado')
+      .in('id_condominio', ids);
+    seguimientoPorDeudor = {};
+    (seguimiento || []).forEach(x => { seguimientoPorDeudor[x.id_deudor] = x; });
+
     // Los residentes dados de baja (N3) no cuentan en el tablero; se listan aparte para poder reactivarlos
     const Dall = deudores || [], C = convenios || [], P = pagos || [];
     const D = Dall.filter(d => d.estado_contacto !== 'Baja');
@@ -1159,7 +1168,7 @@
     const showCondo = currentCondoId === 'ALL';
     // La columna de acciones solo aparece si algún residente escribió después del cierre
     const hayReabiertos = rows.some(d => d.estado_contacto === 'Escalado_Reabierto' || d.estado_contacto === 'Error_Envio');
-    let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th>${hayReabiertos ? '<th>Decisión</th>' : ''}</tr></thead><tbody>`;
+    let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th><th>Próximo pago</th>${hayReabiertos ? '<th>Decisión</th>' : ''}</tr></thead><tbody>`;
     for (const d of rows) {
       const idAttr = escapeHtml(d.id_deudor);
       let decision = '';
@@ -1177,7 +1186,8 @@
         <td>${escapeHtml(d.meses_atraso ?? '—')}</td>
         <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
         <td>${escapeHtml(d.nivel_disposicion || '—')}</td>
-        <td>${estadoBadge(d.estado_contacto)}</td>
+        <td>${estadoBadge(d.estado_contacto)}${alertaAtraso(d.id_deudor)}</td>
+        <td>${proximoPago(d.id_deudor)}</td>
         ${hayReabiertos ? `<td>${decision}</td>` : ''}
       </tr>`;
     }
@@ -1205,6 +1215,20 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
     staggerRows(wrap);
+  }
+
+  // ── SEGUIMIENTO DE CUOTAS DEL CONVENIO (N8) ──────────────────
+  function alertaAtraso(idDeudor) {
+    const x = seguimientoPorDeudor[idDeudor];
+    if (!x || !x.atrasado) return '';
+    return `<div style="margin-top:6px;"><span class="badge bad">🔴 Moroso retrasado · ${x.dias_atraso} día(s) · $${Number(x.monto_atrasado || 0).toLocaleString()}</span></div>`;
+  }
+  function proximoPago(idDeudor) {
+    const x = seguimientoPorDeudor[idDeudor];
+    if (!x) return '<span class="muted">—</span>';
+    if (x.liquidado) return '<span class="badge ok">Convenio liquidado</span>';
+    if (!x.proxima_fecha) return '<span class="muted">—</span>';
+    return `${fechaCorta(x.proxima_fecha)} · $${Number(x.proxima_monto || 0).toLocaleString()}`;
   }
 
   // ── RESIDENTES DADOS DE BAJA (N3) ────────────────────────────
@@ -1754,6 +1778,7 @@
     const reabiertos = deudores.filter(d => d.estado_contacto === 'Escalado_Reabierto').length;
     const cerrados = deudores.filter(d => d.estado_contacto === 'Escalado_Administrador').length;
     const conError = deudores.filter(d => d.estado_contacto === 'Error_Envio').length;
+    const retrasados = deudores.filter(d => (seguimientoPorDeudor[d.id_deudor] || {}).atrasado).length;
     const rechazados = pagos.filter(p => p.estado_pago === 'Rechazado').length;
 
     const acciones = [];
@@ -1762,6 +1787,7 @@
     if (escalados > 0) acciones.push(`⚖️ ${escalados} residente(s) escalados a abogado — dales seguimiento legal`);
     if (reabiertos > 0) acciones.push(`📩 ${reabiertos} residente(s) escribieron después del cierre — usa los botones de la tabla de residentes para retomar el plan de cobro o continuar por la vía legal`);
     if (cerrados > 0) acciones.push(`📁 ${cerrados} cuenta(s) cerradas por falta de respuesta, pendientes de decisión de la administración`);
+    if (retrasados > 0) acciones.push(`🔴 ${retrasados} residente(s) con pagos de convenio atrasados (morosos retrasados) — Lexia ya les envió el aviso; revisa en la tabla de residentes`);
     if (conError > 0) acciones.push(`📵 ${conError} residente(s) con error de envío de WhatsApp — revisa que su teléfono sea correcto y usa "Reintentar envío" en la tabla de residentes`);
     if (!acciones.length) acciones.push('🎉 Sin pendientes urgentes por ahora.');
 
