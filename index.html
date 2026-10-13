@@ -688,7 +688,12 @@
 
     <div class="card">
       <h3>📋 Subir archivo mensual de morosidad</h3>
-      <p class="hint">Sube el archivo Excel (.xlsx) de recuperación de cartera. Los residentes se agregarán o actualizarán automáticamente en el condominio seleccionado arriba — nunca se tocan los datos de otros condominios.</p>
+      <p class="hint">Sube el archivo Excel (.xlsx) de recuperación de cartera. Los residentes se agregarán o actualizarán automáticamente en el condominio seleccionado arriba — nunca se tocan los datos de otros condominios. Incluye siempre a todos los residentes con adeudo: quien ya estaba cargado y no venga en el archivo se te propondrá dar de baja.</p>
+
+      <div style="margin:10px 0 14px; padding:10px 12px; border-radius:8px; background:var(--color-surface-alt); border:1px solid var(--color-border); display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center;">
+        <a class="btn-mini btn-confirmar" href="plantillas/Plantilla_Oficial_Carga_Morosidad_Lexia.xlsx" download style="text-decoration:none;">📥 Descargar plantilla oficial (en blanco)</a>
+        <span class="muted">Recomendado: usa únicamente este formato para que la información se cargue correctamente. No cambies los nombres de las columnas ni de las hojas.</span>
+      </div>
 
       <div class="file-selection-area">
         <label for="fileInput" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
@@ -728,6 +733,11 @@
     <div class="card">
       <h3>🏦 Actualizar datos bancarios y reglas de negociación de tu condominio</h3>
       <p class="hint">Sube la misma plantilla (pestaña "Datos del Condominio") para actualizar la cuenta bancaria, enganche o condonación del condominio que tienes seleccionado arriba. Solo se actualiza TU condominio, sin importar qué otras filas traiga el archivo — nunca se toca el de otro administrador. No se usa para dar de alta un condominio nuevo (eso lo hace Kadena).</p>
+
+      <div style="margin:10px 0 14px; padding:10px 12px; border-radius:8px; background:var(--color-surface-alt); border:1px solid var(--color-border); display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center;">
+        <a class="btn-mini btn-confirmar" href="plantillas/Plantilla_Oficial_Carga_Morosidad_Lexia.xlsx" download style="text-decoration:none;">📥 Descargar plantilla oficial (en blanco)</a>
+        <span class="muted">Recomendado: usa únicamente este formato para que la información se cargue correctamente. No cambies los nombres de las columnas ni de las hojas.</span>
+      </div>
 
       <div class="file-selection-area">
         <label for="fileInputMiCondo" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
@@ -798,6 +808,11 @@
     <div class="card">
       <h3>🏦 Cargar datos bancarios y reglas de negociación por condominio</h3>
       <p class="hint">Sube la plantilla de Excel (pestaña "Datos del Condominio") para dar de alta un condominio nuevo o actualizar su cuenta bancaria, enganche y condonación. Puede traer una fila o varias — cada fila crea o actualiza un condominio, según su ID_Condominio. No hace falta seleccionar un condominio arriba: cada fila trae el suyo.</p>
+
+      <div style="margin:10px 0 14px; padding:10px 12px; border-radius:8px; background:var(--color-surface-alt); border:1px solid var(--color-border); display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center;">
+        <a class="btn-mini btn-confirmar" href="plantillas/Plantilla_Oficial_Carga_Morosidad_Lexia.xlsx" download style="text-decoration:none;">📥 Descargar plantilla oficial (en blanco)</a>
+        <span class="muted">Recomendado: usa únicamente este formato para que la información se cargue correctamente. No cambies los nombres de las columnas ni de las hojas.</span>
+      </div>
 
       <div class="file-selection-area">
         <label for="fileInputCondo" class="btn-select-file">📂 Seleccionar Archivo Excel</label>
