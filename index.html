@@ -1073,7 +1073,7 @@
 
     const { data: deudores } = await supabaseClient
       .from('deudores')
-      .select('id_deudor, nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto, intentos_contacto, id_condominio')
+      .select('id_deudor, nombre, lote, tipo, telefono, adeudo_total, meses_atraso, motivo_adeudo, nivel_disposicion, probabilidad, estado_contacto, intentos_contacto, fecha_inicio_contacto, id_condominio')
       .in('id_condominio', ids);
 
     const { data: convenios } = await supabaseClient
@@ -1154,6 +1154,7 @@
       'Escalado_Administrador': 'pend',
       'Escalado_Reabierto': 'bad',
       'Error_Envio': 'bad',
+      'Programado': 'neutral',
       'Rechazado': 'bad',
     };
     // Estados que Lexia deja al agotar los recordatorios: nombre legible en vez del valor interno
@@ -1161,6 +1162,7 @@
       'Escalado_Administrador': 'Cerrado sin respuesta',
       'Escalado_Reabierto': 'Escribió tras el cierre',
       'Error_Envio': 'Error de envío',
+      'Programado': 'Programado',
     };
     const cls = map[estado] || 'neutral';
     return `<span class="badge ${cls}">${etiquetas[estado] || estado || '—'}</span>`;
@@ -1182,7 +1184,7 @@
     if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados.</p>'; return; }
     const showCondo = currentCondoId === 'ALL';
     // La columna de acciones solo aparece si algún residente escribió después del cierre
-    const hayReabiertos = rows.some(d => d.estado_contacto === 'Escalado_Reabierto' || d.estado_contacto === 'Error_Envio');
+    const hayReabiertos = rows.some(d => ['Escalado_Reabierto', 'Error_Envio', 'Programado'].includes(d.estado_contacto));
     let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th><th>Próximo pago</th>${hayReabiertos ? '<th>Decisión</th>' : ''}</tr></thead><tbody>`;
     for (const d of rows) {
       const idAttr = escapeHtml(d.id_deudor);
@@ -1190,6 +1192,8 @@
       if (d.estado_contacto === 'Escalado_Reabierto') {
         decision = `<button class="btn-mini btn-confirmar" onclick="retomarPlanCobro('${idAttr}')">↻ Retomar plan de cobro</button>
            <button class="btn-mini btn-rechazar" onclick="continuarViaLegal('${idAttr}')">⚖ Continuar vía legal</button>`;
+      } else if (d.estado_contacto === 'Programado') {
+        decision = `<button class="btn-mini btn-confirmar" data-id="${idAttr}" data-nombre="${escapeHtml(d.nombre)}" onclick="activarProgramado(this.dataset.id, this.dataset.nombre)">▶ Activar ahora</button>`;
       } else if (d.estado_contacto === 'Error_Envio') {
         decision = `<button class="btn-mini btn-confirmar" onclick="reintentarEnvio('${idAttr}', ${Number(d.intentos_contacto || 0)})">↻ Reintentar envío</button>`;
       }
@@ -1201,7 +1205,7 @@
         <td>${escapeHtml(d.meses_atraso ?? '—')}</td>
         <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
         <td>${escapeHtml(d.nivel_disposicion || '—')}</td>
-        <td>${estadoBadge(d.estado_contacto)}${alertaAtraso(d.id_deudor)}</td>
+        <td>${estadoBadge(d.estado_contacto)}${d.estado_contacto === 'Programado' ? `<div class="muted" style="margin-top:4px;">${d.fecha_inicio_contacto ? 'Inicia el ' + fechaCorta(d.fecha_inicio_contacto) : 'Sin fecha de inicio'}</div>` : ''}${alertaAtraso(d.id_deudor)}</td>
         <td>${proximoPago(d.id_deudor)}</td>
         ${hayReabiertos ? `<td>${decision}</td>` : ''}
       </tr>`;
@@ -1244,6 +1248,23 @@
     if (x.liquidado) return '<span class="badge ok">Convenio liquidado</span>';
     if (!x.proxima_fecha) return '<span class="muted">—</span>';
     return `${fechaCorta(x.proxima_fecha)} · $${Number(x.proxima_monto || 0).toLocaleString()}`;
+  }
+
+  // ── RESIDENTES PROGRAMADOS ───────────────────────────────────
+  // Cargados en producción pero Lexia no los contacta hasta su fecha de inicio (una tarea diaria
+  // en Supabase los activa a las 8:00 a. m.). Aquí se pueden activar antes.
+  async function activarProgramado(idDeudor, nombre) {
+    if (!confirm(`¿Activar ahora a ${nombre}? Lexia le enviará el mensaje inicial en la próxima corrida automática (lunes a viernes, 8:30 a. m.).`)) return;
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabaseClient
+      .from('deudores')
+      .update({ estado_contacto: 'Pendiente', intentos_contacto: 0, fecha_actualizacion: today })
+      .eq('id_deudor', idDeudor)
+      .eq('estado_contacto', 'Programado')
+      .select('id_deudor');
+    if (error) { alert('No se pudo activar: ' + error.message); return; }
+    if (!data || !data.length) { alert('No se aplicó el cambio (el residente ya no está programado). Recarga la página.'); }
+    await loadDashboard();
   }
 
   // ── RESIDENTES DADOS DE BAJA (N3) ────────────────────────────
