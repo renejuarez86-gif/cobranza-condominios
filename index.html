@@ -1057,6 +1057,12 @@
     await loadDashboard();
   }
 
+  // Nombre del condominio para mostrar (en vez de la clave interna id_condominio)
+  function nombreCondo(id) {
+    const c = condoList.find(x => x.id === id);
+    return (c && c.nombre) || id || '';
+  }
+
   function setupCondoSelector() {
     const wrap = $('condoSelectorWrap');
     const sel = $('condoSelector');
@@ -1218,7 +1224,7 @@
       html += `<tr>
         <td>${escapeHtml(d.nombre)}</td>
         <td>${escapeHtml(d.lote)}</td>
-        ${showCondo ? `<td>${escapeHtml(d.id_condominio)}</td>` : ''}
+        ${showCondo ? `<td>${escapeHtml(nombreCondo(d.id_condominio))}</td>` : ''}
         <td>$${Number(d.adeudo_total || 0).toLocaleString()} <button class="btn-mini" title="Corregir saldo pendiente" data-id="${idAttr}" data-saldo="${Number(d.adeudo_total || 0)}" data-nombre="${escapeHtml(d.nombre)}" onclick="corregirSaldo(this.dataset.id, Number(this.dataset.saldo), this.dataset.nombre)">✏️</button></td>
         <td>${escapeHtml(d.meses_atraso ?? '—')}</td>
         <td>${escapeHtml(d.motivo_adeudo || '—')}</td>
@@ -1297,7 +1303,7 @@
       html += `<tr>
         <td>${escapeHtml(d.nombre)}</td>
         <td>${escapeHtml(d.lote)}</td>
-        ${showCondo ? `<td>${escapeHtml(d.id_condominio)}</td>` : ''}
+        ${showCondo ? `<td>${escapeHtml(nombreCondo(d.id_condominio))}</td>` : ''}
         <td>$${Number(d.adeudo_total || 0).toLocaleString()}</td>
         <td><button class="btn-mini btn-confirmar" data-id="${escapeHtml(d.id_deudor)}" data-nombre="${escapeHtml(d.nombre)}" onclick="reactivarResidente(this.dataset.id, this.dataset.nombre)">↻ Reactivar</button></td>
       </tr>`;
@@ -1335,13 +1341,13 @@
       const d = deudorPorId[p.id_deudor];
       const idPago = escapeHtml(p.id_pago);
       const accion = p.estado_pago === 'Confirmado'
-        ? `<input type="number" class="pago-monto-input" id="hist-monto-${idPago}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01">
+        ? `<input type="number" class="pago-monto-input" id="hist-monto-${idPago}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01"${soloLectura ? ' readonly' : ''}>
            <button class="btn-mini btn-confirmar" data-id="${idPago}" data-deudor="${escapeHtml(p.id_deudor)}" data-monto="${Number(p.monto_pagado || 0)}" onclick="corregirMontoPago(this.dataset.id, this.dataset.deudor, Number(this.dataset.monto))">💾 Guardar</button>`
         : '<span class="muted">—</span>';
       html += `<tr>
         <td>${escapeHtml(d ? d.nombre : p.id_deudor)}</td>
         <td>${escapeHtml(d ? d.lote : '—')}</td>
-        ${showCondo ? `<td>${escapeHtml(p.id_condominio)}</td>` : ''}
+        ${showCondo ? `<td>${escapeHtml(nombreCondo(p.id_condominio))}</td>` : ''}
         <td>${fechaCorta(p.fecha_pago)}</td>
         <td>$${Number(p.monto_pagado || 0).toLocaleString()}</td>
         <td>${estadoBadge(p.estado_pago)}${alertasValidacionPago(p)}</td>
@@ -1399,11 +1405,11 @@
       const lote = d ? d.lote : '—';
       html += `<div class="pago-row">
         <div class="pago-info">
-          <strong>${escapeHtml(nombre)}</strong> — Lote ${escapeHtml(lote)} (${escapeHtml(p.id_condominio)})<br>
+          <strong>${escapeHtml(nombre)}</strong> — Lote ${escapeHtml(lote)} (${escapeHtml(nombreCondo(p.id_condominio))})<br>
           <span class="muted">Reportó pago el ${fechaCorta(p.fecha_pago)} · ${escapeHtml(p.metodo_pago || 'Transferencia')}</span>
           ${alertasValidacionPago(p)}
         </div>
-        <input type="number" class="pago-monto-input" id="monto-${escapeHtml(p.id_pago)}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01">
+        <input type="number" class="pago-monto-input" id="monto-${escapeHtml(p.id_pago)}" value="${Number(p.monto_pagado || 0)}" min="0" step="0.01"${soloLectura ? ' readonly' : ''}>
         <button class="btn-mini btn-confirmar" onclick="confirmarPago('${escapeHtml(p.id_pago)}', '${escapeHtml(p.id_deudor)}', ${p.id_convenio ? 'true' : 'false'})">✅ Confirmar</button>
         <button class="btn-mini btn-rechazar" onclick="rechazarPago('${escapeHtml(p.id_pago)}')">✖ Rechazar</button>
       </div>`;
