@@ -377,6 +377,12 @@
     .badge.pend { background: var(--color-pend-bg); color: var(--color-pend-text); }
     .badge.neutral { background: var(--color-track); color: var(--color-brand); }
     .badge.bad { background: var(--color-danger-bg); color: var(--color-danger); }
+    /* Cuentas de presentación (punto 7): solo lectura. El bloqueo real está en Supabase (RLS restrictivas);
+       aquí solo se ocultan los controles que modifican datos. */
+    #bannerSoloLectura { display: none; margin-bottom: 16px; padding: 12px 16px; border-radius: 10px;
+      background: var(--color-info-bg); color: var(--color-info); font-weight: 600; }
+    body.solo-lectura #bannerSoloLectura { display: block; }
+    body.solo-lectura .btn-mini, body.solo-lectura .solo-escritura { display: none !important; }
 
     /* ── EJECUTIVO / INDICADORES ─────────────────────────────── */
     .exec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -588,6 +594,8 @@
   <!-- ===================== APP ===================== -->
   <div id="app">
 
+    <div id="bannerSoloLectura">👁 Modo presentación: está viendo el Portal en solo lectura con datos ficticios. No es posible subir archivos ni modificar información.</div>
+
     <div class="cards" id="statCards">
       <div class="stat"><div class="num" id="statTotal">–</div><div class="label">Residentes con adeudo</div></div>
       <div class="stat stat-info"><div class="num" id="statNegociacion">–</div><div class="label">En negociación</div></div>
@@ -686,7 +694,7 @@
       <div class="tablewrap" id="conveniosTableWrap"><p class="empty">Cargando…</p></div>
     </div>
 
-    <div class="card">
+    <div class="card solo-escritura">
       <h3>📋 Subir archivo mensual de morosidad</h3>
       <p class="hint">Sube el archivo Excel (.xlsx) de recuperación de cartera. Los residentes se agregarán o actualizarán automáticamente en el condominio seleccionado arriba — nunca se tocan los datos de otros condominios. Incluye siempre a todos los residentes con adeudo: quien ya estaba cargado y no venga en el archivo se te propondrá dar de baja.</p>
 
@@ -730,7 +738,7 @@
       <div class="error-log" id="errorLog"></div>
     </div>
 
-    <div class="card">
+    <div class="card solo-escritura">
       <h3>🏦 Actualizar datos bancarios y reglas de negociación de tu condominio</h3>
       <p class="hint">Sube la misma plantilla (pestaña "Datos del Condominio") para actualizar la cuenta bancaria, enganche o condonación del condominio que tienes seleccionado arriba. Solo se actualiza TU condominio, sin importar qué otras filas traiga el archivo — nunca se toca el de otro administrador. No se usa para dar de alta un condominio nuevo (eso lo hace Kadena).</p>
 
@@ -867,6 +875,7 @@
   let condoList = [];        // [{id, nombre}] — todos los condominios de este administrador
   let currentCondoId = null; // id de un condominio, o 'ALL' para ver todos juntos
   let selectedFile = null;
+  let soloLectura = false; // true = cuenta de presentación (administradores.solo_lectura)
   let esSuperAdministrador = false; // true = usuario del Panel de Dirección (ver tabla super_administradores)
   let lastEjecutivo = null;  // último {deudores, convenios, pagos} — para redibujar las gráficas al cambiar de tema
   let seguimientoPorDeudor = {};  // id_deudor -> seguimiento de cuotas del convenio (N8)
@@ -1023,6 +1032,15 @@
       await supabaseClient.auth.signOut();
       return;
     }
+
+    // Punto 7: las cuentas de presentación ven el Portal sin poder modificar nada
+    const { data: adminRow } = await supabaseClient
+      .from('administradores')
+      .select('solo_lectura')
+      .eq('user_id', uid)
+      .maybeSingle();
+    soloLectura = !!(adminRow && adminRow.solo_lectura);
+    document.body.classList.toggle('solo-lectura', soloLectura);
 
     condoList = links.map(l => ({
       id: l.id_condominio,
@@ -1184,7 +1202,7 @@
     if (!rows.length) { wrap.innerHTML = '<p class="empty">Todavía no hay residentes cargados.</p>'; return; }
     const showCondo = currentCondoId === 'ALL';
     // La columna de acciones solo aparece si algún residente escribió después del cierre
-    const hayReabiertos = rows.some(d => ['Escalado_Reabierto', 'Error_Envio', 'Programado'].includes(d.estado_contacto));
+    const hayReabiertos = !soloLectura && rows.some(d => ['Escalado_Reabierto', 'Error_Envio', 'Programado'].includes(d.estado_contacto));
     let html = `<table><thead><tr><th>Nombre</th><th>Lote</th>${showCondo ? '<th>Condominio</th>' : ''}<th>Saldo</th><th>Meses atraso</th><th>Motivo</th><th>Disposición</th><th>Estado</th><th>Próximo pago</th>${hayReabiertos ? '<th>Decisión</th>' : ''}</tr></thead><tbody>`;
     for (const d of rows) {
       const idAttr = escapeHtml(d.id_deudor);
@@ -2837,6 +2855,17 @@
     btnProcessMiCondoEl.disabled = false;
     btnProcessMiCondoEl.textContent = '🚀 Procesar y actualizar mi condominio';
   }
+
+  // Cuentas de presentación: ninguna acción que modifica datos se ejecuta (Supabase también las rechaza)
+  ['activarProgramado', 'reactivarResidente', 'corregirMontoPago', 'confirmarPago', 'retomarPlanCobro',
+   'continuarViaLegal', 'corregirSaldo', 'reintentarEnvio', 'rechazarPago'].forEach(nombre => {
+    const original = window[nombre];
+    if (typeof original !== 'function') return;
+    window[nombre] = function (...args) {
+      if (soloLectura) { alert('Esta es una cuenta de presentación (solo lectura): no se pueden modificar datos.'); return; }
+      return original.apply(this, args);
+    };
+  });
 
   checkSession();
 </script>
