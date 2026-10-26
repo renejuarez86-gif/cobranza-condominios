@@ -1180,16 +1180,33 @@
       'Error_Envio': 'bad',
       'Programado': 'neutral',
       'Rechazado': 'bad',
+      'Cancelado_Prueba': 'neutral',
+      'Anulado_Prueba': 'neutral',
     };
-    // Estados que Lexia deja al agotar los recordatorios: nombre legible en vez del valor interno
+    // Nombre legible en vez del valor interno (el valor interno no cambia)
     const etiquetas = {
+      'Pendiente': 'Pendiente',
+      'Contactado': 'Contactado',
+      'En_Negociacion': 'En negociación',
+      'Convenio_Enviado_Espera_Firma': 'Esperando firma',
+      'Convenio_Firmado': 'Convenio firmado',
+      'Pago_Reportado': 'Pago reportado',
+      'En_Proceso_Pago': 'En proceso de pago',
+      'Pagado': 'Pagado',
+      'Confirmado': 'Confirmado',
+      'Rechazado': 'Rechazado',
+      'Escalar_Abogado': 'Turnado a abogado',
       'Escalado_Administrador': 'Cerrado sin respuesta',
       'Escalado_Reabierto': 'Escribió tras el cierre',
       'Error_Envio': 'Error de envío',
       'Programado': 'Programado',
+      'Baja': 'Dado de baja',
+      'Cancelado_Prueba': 'Cancelado (prueba)',
+      'Anulado_Prueba': 'Anulado (prueba)',
     };
     const cls = map[estado] || 'neutral';
-    return `<span class="badge ${cls}">${etiquetas[estado] || estado || '—'}</span>`;
+    const texto = etiquetas[estado] || (estado ? String(estado).replace(/_/g, ' ') : '—');
+    return `<span class="badge ${cls}">${escapeHtml(texto)}</span>`;
   }
 
   // Entra la tabla fila por fila (en vez de aparecer de golpe) al recargar
@@ -1248,7 +1265,7 @@
       html += `<tr>
         <td>${escapeHtml(c.nombre_deudor)}</td>
         <td>${escapeHtml(c.unidad)}</td>
-        ${showCondo ? `<td>${escapeHtml(c.id_condominio)}</td>` : ''}
+        ${showCondo ? `<td>${escapeHtml(nombreCondo(c.id_condominio))}</td>` : ''}
         <td>${c.num_mensualidades ?? '—'}</td>
         <td>$${Number(c.monto_mensualidad || 0).toLocaleString()}</td>
         <td>${estadoBadge(c.estado)}</td>
