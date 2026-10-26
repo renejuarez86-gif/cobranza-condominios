@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portal de Administradores — Sistema de Cobranza</title>
+  <title>Lexia Condominios · Portal de administración</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='24' fill='%2306357A'/%3E%3Cpath d='M24 20h72a16 16 0 0 1 16 16v44a16 16 0 0 1-16 16H40L18 116l5-22a16 16 0 0 1-15-16V36A16 16 0 0 1 24 20z' fill='%23fff' transform='translate(12 8) scale(.8)'/%3E%3Cpath d='M42 58l12 11 22-23' fill='none' stroke='%2306357A' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='77' cy='44' r='6' fill='%23FF3B3B'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta name="description" content="Portal para administradores de condominios: reportería ejecutiva, confirmación de pagos y carga del archivo mensual de morosidad.">
 
   <!-- ═══════════════════════════════════════════════════════════
@@ -67,29 +71,29 @@
     :root {
       color-scheme: light;
 
-      --color-bg: #f8faf9;
+      --color-bg: #f5f7fc;
       --color-surface: #ffffff;
-      --color-surface-alt: #f8fafc;
+      --color-surface-alt: #f6f8fd;
 
-      --color-topbar-bg: #064e3b;
+      --color-topbar-bg: #06357A;
       --color-topbar-text: #ffffff;
       --color-topbar-text-muted: rgba(255,255,255,.8);
       --color-topbar-control-bg: rgba(255,255,255,.12);
       --color-topbar-control-bg-hover: rgba(255,255,255,.22);
       --color-topbar-control-border: rgba(255,255,255,.35);
 
-      --color-brand: #064e3b;
-      --color-brand-hover: #022c22;
+      --color-brand: #06357A;
+      --color-brand-hover: #052a61;
       --color-brand-on: #ffffff;
 
-      --color-text: #1e293b;
-      --color-text-secondary: #475569;
-      --color-text-muted: #64748b;
-      --color-text-faint: #94a3b8;
+      --color-text: #0e1b33;
+      --color-text-secondary: #43536e;
+      --color-text-muted: #5b6b86;
+      --color-text-faint: #8a98b0;
 
-      --color-border: #e2e8f0;
-      --color-border-input: #dde4ea;
-      --color-track: #eef2f6;
+      --color-border: #dce4f2;
+      --color-border-input: #d3dcec;
+      --color-track: #edf1f8;
 
       --color-success: #10b981;
       --color-success-hover: #059669;
@@ -124,29 +128,29 @@
       :root:not([data-theme="light"]) {
         color-scheme: dark;
 
-        --color-bg: #0a1512;
-        --color-surface: #11201c;
-        --color-surface-alt: #0e1a17;
+        --color-bg: #08142a;
+        --color-surface: #0f1f3a;
+        --color-surface-alt: #0b1830;
 
-        --color-topbar-bg: #0e1f19;
-        --color-topbar-text: #eafaf3;
-        --color-topbar-text-muted: rgba(234,250,243,.75);
+        --color-topbar-bg: #0a1d3d;
+        --color-topbar-text: #eef3ff;
+        --color-topbar-text-muted: rgba(238,243,255,.75);
         --color-topbar-control-bg: rgba(255,255,255,.08);
         --color-topbar-control-bg-hover: rgba(255,255,255,.16);
         --color-topbar-control-border: rgba(255,255,255,.22);
 
-        --color-brand: #34d399;
-        --color-brand-hover: #6ee7b7;
-        --color-brand-on: #04140f;
+        --color-brand: #8fb4ff;
+        --color-brand-hover: #b7cdff;
+        --color-brand-on: #08142a;
 
-        --color-text: #e5f2ec;
-        --color-text-secondary: #aac2ba;
-        --color-text-muted: #8ba69c;
-        --color-text-faint: #809a90;
+        --color-text: #e6ecf8;
+        --color-text-secondary: #b3c1da;
+        --color-text-muted: #93a3c0;
+        --color-text-faint: #8293b0;
 
-        --color-border: #1f3a33;
-        --color-border-input: #24443c;
-        --color-track: #16302a;
+        --color-border: #1d3157;
+        --color-border-input: #243a66;
+        --color-track: #142849;
 
         --color-success: #10b981;
         --color-success-hover: #34d399;
@@ -171,7 +175,7 @@
         --color-info: #60a5fa;
         --color-info-bg: rgba(59,130,246,.16);
 
-        --color-disabled-bg: #3a4c47;
+        --color-disabled-bg: #3a4a66;
 
         --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
         --shadow-stat: 0 1px 3px rgba(0,0,0,0.3);
@@ -181,29 +185,29 @@
     :root[data-theme="dark"] {
       color-scheme: dark;
 
-      --color-bg: #0a1512;
-      --color-surface: #11201c;
-      --color-surface-alt: #0e1a17;
+      --color-bg: #08142a;
+      --color-surface: #0f1f3a;
+      --color-surface-alt: #0b1830;
 
-      --color-topbar-bg: #0e1f19;
-      --color-topbar-text: #eafaf3;
-      --color-topbar-text-muted: rgba(234,250,243,.75);
+      --color-topbar-bg: #0a1d3d;
+      --color-topbar-text: #eef3ff;
+      --color-topbar-text-muted: rgba(238,243,255,.75);
       --color-topbar-control-bg: rgba(255,255,255,.08);
       --color-topbar-control-bg-hover: rgba(255,255,255,.16);
       --color-topbar-control-border: rgba(255,255,255,.22);
 
-      --color-brand: #34d399;
-      --color-brand-hover: #6ee7b7;
-      --color-brand-on: #04140f;
+      --color-brand: #8fb4ff;
+      --color-brand-hover: #b7cdff;
+      --color-brand-on: #08142a;
 
-      --color-text: #e5f2ec;
-      --color-text-secondary: #aac2ba;
-      --color-text-muted: #8ba69c;
-      --color-text-faint: #809a90;
+      --color-text: #e6ecf8;
+      --color-text-secondary: #b3c1da;
+      --color-text-muted: #93a3c0;
+      --color-text-faint: #8293b0;
 
-      --color-border: #1f3a33;
-      --color-border-input: #24443c;
-      --color-track: #16302a;
+      --color-border: #1d3157;
+      --color-border-input: #243a66;
+      --color-track: #142849;
 
       --color-success: #10b981;
       --color-success-hover: #34d399;
@@ -228,14 +232,14 @@
       --color-info: #60a5fa;
       --color-info-bg: rgba(59,130,246,.16);
 
-      --color-disabled-bg: #3a4c47;
+      --color-disabled-bg: #3a4a66;
 
       --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
       --shadow-stat: 0 1px 3px rgba(0,0,0,0.3);
     }
 
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--color-bg);
       color: var(--color-text);
       min-height: 100vh;
@@ -261,8 +265,8 @@
       display: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
       padding: 3px 9px; border-radius: 999px; line-height: 1.4;
     }
-    .portal-badge.cliente { display: inline-block; background: var(--color-success-bg); color: var(--color-success); }
-    .portal-badge.direccion { display: inline-block; background: var(--color-info-bg); color: var(--color-info); }
+    .portal-badge.cliente { display: inline-block; background: rgba(255,255,255,.16); color: #fff; }
+    .portal-badge.direccion { display: inline-block; background: #FF3B3B; color: #fff; }
     .topbar-right { display: flex; align-items: center; gap: 12px; }
     .user-identity {
       display: none; align-items: center; gap: 6px; font-size: 12px; color: var(--color-topbar-text);
@@ -319,7 +323,36 @@
     .card p.hint { color: var(--color-text-muted); font-size: 13px; margin-bottom: 1rem; }
 
     /* ── LOGIN ───────────────────────────────────────────────── */
-    #loginScreen { max-width: 380px; margin: 90px auto; }
+    .topbar-brand { display: flex; align-items: center; gap: 12px; }
+    .topbar-logo { width: 34px; height: 34px; flex-shrink: 0; }
+    .topbar h1 .i, .wordmark .i { color: #FF3B3B; }
+
+    /* Pantalla de inicio de sesión con la identidad de Lexia */
+    #loginScreen.login-hero {
+      position: relative; overflow: hidden;
+      width: 100vw; margin-left: calc(50% - 50vw); margin-top: -2rem;
+      min-height: calc(100vh - 66px);
+      background: #06357A; color: #fff;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 36px; padding: 56px 20px;
+    }
+    :root[data-theme="dark"] #loginScreen.login-hero { background: #0a2350; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #loginScreen.login-hero { background: #0a2350; } }
+    .login-deco { position: absolute; opacity: .08; pointer-events: none; }
+    .login-brand { position: relative; text-align: center; }
+    .login-logo-row { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; }
+    .login-logo { width: 84px; height: 84px; }
+    .wordmark { font-size: 64px; font-weight: 500; letter-spacing: -.01em; line-height: 1; }
+    .login-divider { width: 2px; height: 64px; background: rgba(255,255,255,.35); }
+    .login-sub { font-size: 44px; font-weight: 400; line-height: 1; }
+    .login-tagline { margin-top: 26px; font-size: 19px; line-height: 1.5; color: #fff; }
+    .login-tags { margin-top: 16px; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: #BFD0EE; }
+    .login-card { position: relative; max-width: 380px; margin: 0; color: var(--color-text); }
+    .login-foot { position: relative; font-size: 13px; color: #BFD0EE; }
+    @media (max-width: 640px) {
+      .wordmark { font-size: 46px; } .login-sub { font-size: 32px; } .login-logo { width: 60px; height: 60px; }
+      .login-divider { display: none; } .login-tagline { font-size: 16px; } .login-tags { letter-spacing: .12em; }
+    }
     label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: var(--color-text); }
     input[type=email], input[type=password], input[type=file], input[type=number] {
       width: 100%;
@@ -358,10 +391,10 @@
     .stat:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.08); }
     .stat .num { font-size: 26px; font-weight: 700; color: var(--color-brand); font-variant-numeric: tabular-nums; }
     .stat .label { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
-    .stat.stat-info:hover    { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-info) 30%, transparent); }
-    .stat.stat-warning:hover { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-warning) 30%, transparent); }
-    .stat.stat-danger:hover  { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-danger) 30%, transparent); }
-    .stat.stat-success:hover { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-success) 30%, transparent); }
+    .stat.stat-info:hover    { box-shadow: 0 6px 18px rgba(15,23,42,.14); }
+    .stat.stat-warning:hover { box-shadow: 0 6px 18px rgba(15,23,42,.14); }
+    .stat.stat-danger:hover  { box-shadow: 0 6px 18px rgba(15,23,42,.14); }
+    .stat.stat-success:hover { box-shadow: 0 6px 18px rgba(15,23,42,.14); }
     #statCards .stat:nth-child(1) { animation-delay: .02s; }
     #statCards .stat:nth-child(2) { animation-delay: .07s; }
     #statCards .stat:nth-child(3) { animation-delay: .12s; }
@@ -433,9 +466,9 @@
     .condo-card.tier-mid { box-shadow: inset 0 4px 0 0 var(--color-warning); }
     .condo-card.tier-bad { box-shadow: inset 0 4px 0 0 var(--color-danger); }
     .condo-card:hover { transform: translateY(-2px); }
-    .condo-card.tier-good:hover { box-shadow: inset 0 4px 0 0 var(--color-success), 0 4px 16px color-mix(in srgb, var(--color-success) 25%, transparent); }
-    .condo-card.tier-mid:hover  { box-shadow: inset 0 4px 0 0 var(--color-warning), 0 4px 16px color-mix(in srgb, var(--color-warning) 25%, transparent); }
-    .condo-card.tier-bad:hover  { box-shadow: inset 0 4px 0 0 var(--color-danger), 0 4px 16px color-mix(in srgb, var(--color-danger) 25%, transparent); }
+    .condo-card.tier-good:hover { box-shadow: inset 0 4px 0 0 var(--color-success), 0 6px 18px rgba(15,23,42,.14); }
+    .condo-card.tier-mid:hover  { box-shadow: inset 0 4px 0 0 var(--color-warning), 0 6px 18px rgba(15,23,42,.14); }
+    .condo-card.tier-bad:hover  { box-shadow: inset 0 4px 0 0 var(--color-danger), 0 6px 18px rgba(15,23,42,.14); }
     .condo-card h5 { font-size: 13px; color: var(--color-text); margin-bottom: 6px; }
     .condo-card .condo-pct { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; color: var(--color-text-secondary); }
     .condo-card.tier-good .condo-pct { color: var(--color-success); }
@@ -562,13 +595,26 @@
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="lexia-logo" viewBox="0 0 120 120">
+      <path d="M24 20h72a16 16 0 0 1 16 16v44a16 16 0 0 1-16 16H40L18 116l5-22a16 16 0 0 1-15-16V36A16 16 0 0 1 24 20z" fill="#fff"/>
+      <path d="M38 59l14 13 26-27" fill="none" stroke="#06357A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="80" cy="42" r="7" fill="#FF3B3B"/>
+    </symbol>
+  </defs>
+</svg>
+
 <div class="topbar">
-  <div>
+  <div class="topbar-brand">
+    <svg class="topbar-logo" aria-hidden="true"><use href="#lexia-logo"/></svg>
+    <div>
     <div class="topbar-title-row">
-      <h1 id="portalTitle">Portal de Administradores</h1>
+      <h1 id="portalTitle">Lex<span class="i">i</span>a Condominios</h1>
       <span class="portal-badge" id="portalBadge"></span>
     </div>
-    <div class="sub" id="portalSub">Sistema de Cobranza</div>
+    <div class="sub" id="portalSub">Portal de administración</div>
+    </div>
   </div>
   <div class="topbar-right">
     <div class="user-identity" id="userIdentity" title="Sesión activa">
@@ -587,15 +633,30 @@
 <div class="wrap">
 
   <!-- ===================== LOGIN ===================== -->
-  <div id="loginScreen" class="card">
-    <h2>Iniciar sesión</h2>
-    <p class="hint">Ingresa con el correo y contraseña que te compartieron.</p>
-    <label for="email">Correo electrónico</label>
-    <input type="email" id="email" placeholder="tu@correo.com" />
-    <label for="password">Contraseña</label>
-    <input type="password" id="password" placeholder="••••••••" />
-    <button class="primary" id="loginBtn">Entrar</button>
-    <div id="loginError"></div>
+  <div id="loginScreen" class="login-hero">
+    <svg class="login-deco" style="width:420px;height:420px;left:-90px;top:-110px" aria-hidden="true"><use href="#lexia-logo"/></svg>
+    <svg class="login-deco" style="width:340px;height:340px;right:-70px;bottom:-110px" aria-hidden="true"><use href="#lexia-logo"/></svg>
+    <div class="login-brand">
+      <div class="login-logo-row">
+        <svg class="login-logo" aria-hidden="true"><use href="#lexia-logo"/></svg>
+        <div class="wordmark">Lex<span class="i">i</span>a</div>
+        <div class="login-divider"></div>
+        <div class="login-sub">Condominios</div>
+      </div>
+      <p class="login-tagline">Recupere la cartera vencida de su condominio<br>por WhatsApp, sin confrontar a sus vecinos</p>
+      <p class="login-tags">Convenios firmados · Seguimiento continuo · Con las reglas de su asamblea</p>
+    </div>
+    <div class="card login-card">
+      <h2>Iniciar sesión</h2>
+      <p class="hint">Ingresa con el correo y contraseña que te compartieron.</p>
+      <label for="email">Correo electrónico</label>
+      <input type="email" id="email" placeholder="tu@correo.com" />
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••" />
+      <button class="primary" id="loginBtn">Entrar</button>
+      <div id="loginError"></div>
+    </div>
+    <p class="login-foot">Un servicio de Zires Abogados</p>
   </div>
 
   <!-- ===================== APP ===================== -->
@@ -893,7 +954,7 @@
   // tanto para los conteos progresivos de los KPIs como para las gráficas.
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
+  Chart.defaults.font.family = "'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif";
   Chart.defaults.font.size = 11;
   // Rutinario y rápido (actualizar un dato ya visible), no una entrada de
   // pantalla completa — ver sección "Timing and easing" de /impeccable animate.
@@ -993,8 +1054,8 @@
   // un vistazo ni de confirmar con qué cuenta quedó la sesión abierta.
   function setPortalIdentity(kind, email, nombre) {
     const esDireccion = kind === 'direccion';
-    $('portalTitle').textContent = esDireccion ? 'Panel de Dirección' : 'Portal de Administradores';
-    $('portalSub').textContent = esDireccion ? 'Zires Abogados · Vista ejecutiva' : 'Sistema de Cobranza';
+    $('portalTitle').innerHTML = esDireccion ? 'Lex<span class="i">i</span>a · Panel de Dirección' : 'Lex<span class="i">i</span>a Condominios';
+    $('portalSub').textContent = esDireccion ? 'Zires Abogados · Vista ejecutiva' : 'Portal de administración';
     $('portalBadge').textContent = esDireccion ? 'Dirección' : 'Cliente';
     $('portalBadge').className = 'portal-badge ' + kind;
 
