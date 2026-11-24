@@ -658,7 +658,7 @@
       <button class="primary" id="loginBtn">Entrar</button>
       <div id="loginError"></div>
     </div>
-    <p class="login-foot">Un servicio de Zires Abogados</p>
+    <p class="login-foot">Lexia Cobranza</p>
   </div>
 
   <!-- ===================== APP ===================== -->
@@ -873,7 +873,7 @@
 
     <div class="card">
       <h3>⏸ Pausa de Lexia por Administración</h3>
-      <p class="hint">Si una Administración no está al corriente con su pago, aquí puedes detener a Lexia para todos sus condominios a la vez. En pausa, Lexia no envía mensajes iniciales ni recordatorios, y si un residente escribe le responde un mensaje neutro (sin datos de pago). Al reanudar, la secuencia continúa donde se quedó en la siguiente corrida automática (lunes a viernes).</p>
+      <p class="hint">Si una Administración no está al corriente con su pago, aquí puedes detener a Lexia para todos sus condominios a la vez. En pausa, Lexia no envía mensajes iniciales ni recordatorios, y si un residente escribe le responde un mensaje neutro (sin datos de pago). Al reanudar, la secuencia continúa donde se quedó en la siguiente corrida automática (lunes a sábado).</p>
       <div class="tablewrap" id="pausaAdminWrap"><p class="empty">Cargando…</p></div>
     </div>
 
@@ -1057,7 +1057,7 @@
   function setPortalIdentity(kind, email, nombre) {
     const esDireccion = kind === 'direccion';
     $('portalTitle').innerHTML = esDireccion ? 'Lex<span class="i">i</span>a · Panel de Dirección' : 'Lex<span class="i">i</span>a Condominios';
-    $('portalSub').textContent = esDireccion ? 'Zires Abogados · Vista ejecutiva' : 'Portal de administración';
+    $('portalSub').textContent = esDireccion ? 'Vista ejecutiva' : 'Portal de administración';
     $('portalBadge').textContent = esDireccion ? 'Dirección' : 'Cliente';
     $('portalBadge').className = 'portal-badge ' + kind;
 
@@ -1365,7 +1365,7 @@
   // Cargados en producción pero Lexia no los contacta hasta su fecha de inicio (una tarea diaria
   // en Supabase los activa a las 8:00 a. m.). Aquí se pueden activar antes.
   async function activarProgramado(idDeudor, nombre) {
-    if (!confirm(`¿Activar ahora a ${nombre}? Lexia le enviará el mensaje inicial en la próxima corrida automática (lunes a viernes, 8:30 a. m.).`)) return;
+    if (!confirm(`¿Activar ahora a ${nombre}? Lexia le enviará el mensaje inicial en la próxima corrida automática de la mañana (lunes a sábado).`)) return;
     const today = new Date().toISOString().split('T')[0];
     const { data, error } = await supabaseClient
       .from('deudores')
@@ -1400,7 +1400,7 @@
   }
 
   async function reactivarResidente(idDeudor, nombre) {
-    if (!confirm(`¿Reactivar a ${nombre}? Volverá al tablero y Lexia le enviará de nuevo el mensaje inicial en la próxima corrida automática (lunes a viernes).`)) return;
+    if (!confirm(`¿Reactivar a ${nombre}? Volverá al tablero y Lexia le enviará de nuevo el mensaje inicial en la próxima corrida automática (lunes a sábado).`)) return;
     const today = new Date().toISOString().split('T')[0];
     const { data, error } = await supabaseClient
       .from('deudores')
@@ -1569,7 +1569,7 @@
   }
 
   async function retomarPlanCobro(idDeudor) {
-    if (!confirm('¿Retomar el plan de cobro? Lexia le enviará de nuevo el recordatorio 1 por WhatsApp en la próxima corrida automática (lunes a viernes) y reiniciará la secuencia de seguimiento.')) return;
+    if (!confirm('¿Retomar el plan de cobro? Lexia le enviará de nuevo el recordatorio 1 por WhatsApp en la próxima corrida automática (lunes a sábado) y reiniciará la secuencia de seguimiento.')) return;
     const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     await decidirTrasCierre(idDeudor,
       { estado_contacto: 'Contactado', intentos_contacto: 1, fecha_actualizacion: ayer },
@@ -1611,7 +1611,7 @@
   }
 
   async function reintentarEnvio(idDeudor, intentos) {
-    if (!confirm('¿Reintentar el envío? Verifica antes que el teléfono del residente sea correcto. Lexia lo intentará de nuevo en la próxima corrida automática (lunes a viernes).')) return;
+    if (!confirm('¿Reintentar el envío? Verifica antes que el teléfono del residente sea correcto. Lexia lo intentará de nuevo en la próxima corrida automática (lunes a sábado).')) return;
     const ayer = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     const { data, error } = await supabaseClient
       .from('deudores')
@@ -2055,7 +2055,7 @@
 
     const pregunta = pausar
       ? `¿Pausar Lexia para "${nombre}"?\n\nSe detienen los envíos y recordatorios de ${residentes} residente(s) en ${condos.length} condominio(s). Si un residente escribe, Lexia le responderá un mensaje neutro y no enviará datos de pago.`
-      : `¿Reanudar Lexia para "${nombre}"?\n\nLos envíos continuarán en la próxima corrida automática (lunes a viernes), desde donde se quedaron.`;
+      : `¿Reanudar Lexia para "${nombre}"?\n\nLos envíos continuarán en la próxima corrida automática (lunes a sábado), desde donde se quedaron.`;
     if (!confirm(pregunta)) return;
 
     const { data, error } = await supabaseClient
@@ -2208,7 +2208,7 @@
     'banco': 'banco',
     'clabe_cuenta': 'clabeCuenta',
     'administrador': 'administrador',
-    // Nombre que entiende el administrador (pedido de Zires); el sistema lo guarda igual que "Administrador"
+    // Nombre que entiende el administrador (pedido del cliente); el sistema lo guarda igual que "Administrador"
     'administración (empresa)': 'administrador',
     'administracion (empresa)': 'administrador',
     'permite_enganche': 'permiteEnganche',
@@ -2267,7 +2267,7 @@
         out.push({
           id_condominio: idCondominio,
           nombre_condominio: cleanText(row[colMap.nombreCondominio]),
-          entidad_firma: cleanText(row[colMap.entidadFirma]) || 'Zires Abogados',
+          entidad_firma: cleanText(row[colMap.entidadFirma]) || cleanText(row[colMap.administrador]) || 'La administración',
           banco_condominio: cleanText(row[colMap.banco]),
           clabe_cuenta_condominio: cleanText(row[colMap.clabeCuenta]),
           administrador: cleanText(row[colMap.administrador]),
